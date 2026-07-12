@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Design Verification Cycle — Foundations for AI-Assisted Chip Design</title>
+<style>
+  :root{
+    --bg:#0c1222; --bg2:#111a30; --panel:#16203a; --panel2:#1d2a49;
+    --ink:#e9eef7; --muted:#9fb0cc; --line:#2b3a5e;
+    --accent:#ff9900;     /* primary accent */
+    --accent2:#2bd4c4;    /* teal */
+    --accent3:#7aa2ff;    /* blue */
+    --good:#39d98a; --warn:#ffcc66; --bad:#ff6b6b;
+    --dut:#ff9900; --tb:#2bd4c4; --ref:#7aa2ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, #17233f 0%, var(--bg) 55%);
+    color:var(--ink); font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+  #deck{height:100vh;width:100vw;position:relative}
+  .slide{
+    position:absolute;inset:0;display:none;flex-direction:column;
+    padding:44px 64px 70px;opacity:0;transition:opacity .25s ease;
+  }
+  .slide.active{display:flex;opacity:1}
+  h1,h2,h3{margin:0;line-height:1.12}
+  .kicker{color:var(--accent);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:13px;margin-bottom:10px}
+  h2.title{font-size:36px;font-weight:800;letter-spacing:-.5px}
+  h2.title .hl{color:var(--accent)}
+  .sub{color:var(--muted);font-size:16px;margin-top:9px;max-width:1080px;line-height:1.5}
+  .body{flex:1;display:flex;gap:28px;margin-top:18px;min-height:0}
+  .col{flex:1;min-width:0}
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .card h3{font-size:15.5px;color:var(--accent2);margin-bottom:7px;letter-spacing:.02em}
+  ul.clean{margin:5px 0 0;padding-left:18px}
+  ul.clean li{margin:6px 0;color:#cfdaee;font-size:14.5px;line-height:1.48}
+  ul.clean li b{color:#fff}
+  .pill{display:inline-block;background:#22314f;border:1px solid var(--line);color:var(--muted);
+    border-radius:999px;padding:3px 11px;font-size:12.5px;margin:3px 5px 3px 0}
+  .ai{background:linear-gradient(180deg,#241a08,#1a1405);border:1px solid #6b4c12;border-radius:12px;padding:12px 15px;margin-top:12px}
+  .ai .tag{color:var(--accent);font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  .ai p{margin:6px 0 0;color:#f0dcb8;font-size:13.8px;line-height:1.48}
+  .ai .bulb{width:16px;height:16px;display:inline-block}
+  .footer{position:absolute;left:64px;right:64px;bottom:24px;display:flex;justify-content:space-between;align-items:center;color:#63769a;font-size:12.5px;border-top:1px solid var(--line);padding-top:12px}
+  .footer .brand{font-weight:700;color:#8fa3c6;letter-spacing:.04em}
+  .progress{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);transition:width .25s}
+  .num{position:absolute;right:20px;bottom:22px;color:#5b6d90;font-size:12px}
+  .hint{position:absolute;left:20px;bottom:22px;color:#3d4c6b;font-size:11px}
+  /* diagram helpers */
+  svg{width:100%;height:100%;display:block}
+  .dg{width:100%;height:100%;min-height:0}
+  text{font-family:"Segoe UI",Roboto,Arial,sans-serif}
+  .lbl{fill:var(--ink);font-size:13px}
+  .lbls{fill:var(--muted);font-size:11px}
+  .box{fill:var(--panel2);stroke:var(--line);stroke-width:1.4}
+  .flow{stroke:var(--muted);stroke-width:2;fill:none;marker-end:url(#arr)}
+  .flow2{stroke:var(--accent2);stroke-width:2;fill:none;marker-end:url(#arrT)}
+  .flowO{stroke:var(--accent);stroke-width:2.4;fill:none;marker-end:url(#arrO)}
+  .kbig{fill:#fff;font-weight:700;font-size:15px}
+  /* title slide */
+  .cover{align-items:flex-start;justify-content:center}
+  .cover .chip{width:120px;height:120px;margin-bottom:26px}
+  .cover h1{font-size:58px;font-weight:800;letter-spacing:-1px;max-width:1100px}
+  .cover h1 .hl{color:var(--accent)}
+  .cover .tagline{color:var(--muted);font-size:21px;margin-top:20px;max-width:900px;line-height:1.5}
+  .badgerow{margin-top:30px;display:flex;gap:12px;flex-wrap:wrap}
+  .badge{background:#16203a;border:1px solid var(--line);border-radius:10px;padding:10px 16px;font-size:14px;color:#cfe;}
+  .badge b{color:var(--accent)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  .metric{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:14px;padding:16px 18px;text-align:center}
+  .metric .big{font-size:38px;font-weight:800;color:var(--accent)}
+  .metric .cap{color:var(--muted);font-size:13px;margin-top:4px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px}
+  .legend span{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:7px}
+  .sw{width:14px;height:14px;border-radius:3px;display:inline-block}
+  .note{color:var(--muted);font-size:12.8px;font-style:italic;margin-top:8px}
+  .quote{font-size:25px;font-weight:600;line-height:1.4;max-width:1040px;color:#fff}
+  .quote .hl{color:var(--accent)}
+  .small{font-size:13.4px;color:#cfdaee;line-height:1.48}
+  .small b{color:#fff}
+  table.matrix{width:100%;border-collapse:collapse;font-size:13px}
+  table.matrix th,table.matrix td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.matrix th{background:#1b2743;color:var(--accent2);font-weight:700}
+  table.matrix td b{color:#fff}
+  table.matrix tr:nth-child(even) td{background:#111a30}
+  .disc{position:fixed;top:10px;right:16px;font-size:10.5px;color:#3d4c6b}
+  .contact{color:var(--muted);font-size:14.5px;margin-top:20px}
+  .contact b{color:#cfe}
+  .toc{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+  .agrow{display:flex;align-items:center;gap:16px;background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:12px;padding:11px 18px;cursor:pointer;transition:border-color .15s ease,transform .15s ease}
+  .agrow:hover{border-color:var(--accent);transform:translateX(5px)}
+  .agrow .n{flex:0 0 38px;height:38px;border-radius:9px;background:#1b2743;color:var(--accent);font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center}
+  .agrow .t{font-size:16px;color:#fff;font-weight:700}
+  .agrow .d{font-size:12.8px;color:var(--muted);margin-top:1px}
+  .agrow .pg{margin-left:auto;color:#63769a;font-size:12px;white-space:nowrap;padding-left:14px}
+  .def{color:#9fb0cc;font-weight:400}
+  .tagchip{display:inline-block;font-size:11px;color:#0c1222;background:var(--accent2);border-radius:5px;padding:1px 7px;font-weight:700;margin-right:6px}
+  @media print{
+    body{overflow:visible;background:#0c1222 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #deck{height:auto}
+    .slide{display:flex !important;opacity:1 !important;position:relative;height:100vh;page-break-after:always;inset:auto}
+    .progress,.num,.hint,#nav{display:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="disc">Educational • Generic industry example • No proprietary/program-specific content</div>
+<div id="deck"></div>
+<div class="progress" id="prog"></div>
+<div class="num" id="num"></div>
+<div class="hint">← → navigate · F fullscreen · O overview · P print/PDF</div>
+
+<script>
+/* ============================ SLIDE CONTENT ============================ */
+const bulb = '<svg class="bulb" viewBox="0 0 24 24" fill="none" stroke="#ff9900" stroke-width="2"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10c1 1 1.5 2 1.5 3h5c0-1 .5-2 1.5-3A6 6 0 0 0 12 3z"/></svg>';
+function ai(txt){return `<div class="ai"><div class="tag">${bulb} Where a model helps — and where it fails</div><p>${txt}</p></div>`;}
+function foot(t){return `<div class="footer"><span class="brand">Design Verification — Foundations</span><span>${t}</span></div>`;}
+
+/* reusable SVG defs (arrow markers) */
+const DEFS = `<defs>
+  <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9fb0cc"/></marker>
+  <marker id="arrT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2bd4c4"/></marker>
+  <marker id="arrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff9900"/></marker>
+  <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff6b6b"/></marker>
+</defs>`;
+
+const slides = [];
+
+/* ---- 1. COVER ---- */
+slides.push(`
+<div class="slide cover">
+  <svg class="chip" viewBox="0 0 120 120">
+    <rect x="26" y="26" width="68" height="68" rx="8" fill="#16203a" stroke="#ff9900" stroke-width="2.5"/>
+    <rect x="42" y="42" width="36" height="36" rx="4" fill="#1d2a49" stroke="#2bd4c4" stroke-width="2"/>
+    <text x="60" y="64" fill="#2bd4c4" font-size="12" text-anchor="middle" font-weight="700">DUT</text>
+    ${[...Array(5)].map((_,i)=>`<line x1="${34+i*13}" y1="26" x2="${34+i*13}" y2="12" stroke="#7aa2ff" stroke-width="2"/><line x1="${34+i*13}" y1="94" x2="${34+i*13}" y2="108" stroke="#7aa2ff" stroke-width="2"/><line x1="26" y1="${34+i*13}" x2="12" y2="${34+i*13}" stroke="#7aa2ff" stroke-width="2"/><line x1="94" y1="${34+i*13}" x2="108" y2="${34+i*13}" stroke="#7aa2ff" stroke-width="2"/>`).join('')}
+  </svg>
+  <div class="kicker">A foundations primer</div>
+  <h1>The <span class="hl">Design Verification</span> Cycle</h1>
+  <div class="tagline">How a custom AI accelerator is proven correct — start to end, across every testbench scope — and where machine learning can accelerate the work.</div>
+  <div class="badgerow">
+    <div class="badge"><b>Audience:</b> ML / model-training engineers entering silicon</div>
+    <div class="badge"><b>Running example:</b> a DMA data-movement subsystem</div>
+    <div class="badge"><b>Goal:</b> DV know-how → AI-assisted chip design</div>
+  </div>
+  <div class="contact"><b>Shrikant Sundaram</b> · sskant@amazon.com</div>
+  ${foot('01 · Title')}
+</div>`);
+
+/* ---- 2. AGENDA / CONTENTS (clickable) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">What we'll cover</div>
+  <h2 class="title">Contents <span class="hl">— click any section to jump</span></h2>
+  <div class="body"><div class="col">
+    <div class="toc">
+      ${[
+        ['1','Why &amp; what','Why verification dominates a chip program; the black-box first principle','3','5'],
+        ['2','The 10-phase cycle','Spec → plan → test harness → stimulus → checking → coverage → regression','4','21'],
+        ['3','Breadth beyond one block','Dependencies you do not own; block → SoC → third-party-VIP scopes','10','14'],
+        ['4','How engineers root-cause','The disciplined RCA method; provenance; how models fail at it','21','24'],
+        ['5','LLM in DV — what we learned','Greenfield vs brownfield; the honest pain-points','25','26'],
+        ['6','The program view','Milestones &amp; Design–DV lockstep; where a model helps, by phase and over time','31','36'],
+        ['7','For model training','Why verifiable rewards fit; guardrails; takeaways','37','39']
+      ].map(([n,t,d,go,pg])=>`<div class="agrow" onclick="show(${go}-1)"><div class="n">${n}</div><div><div class="t">${t}</div><div class="d">${d}</div></div><div class="pg">slides ${go}–${pg}</div></div>`).join('')}
+    </div>
+  </div></div>
+  ${foot('02 · Contents')}
+</div>`);
+
+/* ---- 3. WHY IT MATTERS ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Motivation</div>
+  <h2 class="title">Why verification <span class="hl">dominates</span> a chip program</h2>
+  <div class="sub">Silicon is unforgiving: a functional bug that escapes to fabrication costs a multi-million-dollar <b>respin</b> <span class="def">(re-fabricating the chip — new photomasks, months of schedule)</span> and cannot be patched in the field. Verification buys confidence <i>before</i> <b>tape-out</b> <span class="def">(the point of no return, when the design is committed to manufacturing)</span>.</div>
+  <div class="body">
+    <div class="col">
+      <div class="three" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="metric"><div class="big">~60-70%</div><div class="cap">of total chip-project effort is verification</div></div>
+        <div class="metric"><div class="big">$Ms</div><div class="cap">cost of a mask respin from one escaped bug</div></div>
+        <div class="metric"><div class="big">10⁹+</div><div class="cap">state combinations a modern block can reach</div></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>The core problem</h3>
+        <ul class="clean">
+          <li>The design — its <b>RTL</b> <span class="def">(Register-Transfer Level: the source-code description of the hardware being verified)</span> — is an <b>enormous state machine</b>; exhaustive testing is impossible.</li>
+          <li>Bugs hide in <b>corner cases</b> — rare interactions, <b>back-pressure</b> <span class="def">(a receiver signalling "I am full, stop" so the sender must stall)</span>, reordering, resets mid-operation.</li>
+          <li>Verification's job: reach those corners on purpose, and <b>prove</b> behavior against the spec.</li>
+        </ul>
+      </div>
+      ${ai('Model-training analogy: DV is to silicon what eval + red-teaming is to a model. Both spend most of the budget <b>proving</b> the artifact behaves, not building it. The mindset transfers — most of the budget goes to proving, not building — even though the specific techniques differ.')}
+    </div>
+    <div class="col card">
+      <h3>Bug cost grows exponentially with time-to-find</h3>
+      <div class="dg"><svg viewBox="0 0 520 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <line x1="60" y1="290" x2="500" y2="290" stroke="#2b3a5e" stroke-width="1.5"/>
+        <line x1="60" y1="40" x2="60" y2="290" stroke="#2b3a5e" stroke-width="1.5"/>
+        <text x="280" y="325" class="lbls" text-anchor="middle">when the bug is found →</text>
+        <text x="24" y="165" class="lbls" transform="rotate(-90 24 165)" text-anchor="middle">cost to fix (log)</text>
+        <path d="M70 280 Q200 275 300 235 T480 60" stroke="#ff9900" stroke-width="3" fill="none"/>
+        ${[['Unit sim',70,280],['Block DV',180,262],['SoC integ',290,222],['Emulation',370,150],['Silicon',470,66]].map(([t,x,y])=>`<circle cx="${x}" cy="${y}" r="5" fill="#ff9900"/><text x="${x}" y="${y-12}" class="lbls" text-anchor="middle">${t}</text>`).join('')}
+        <text x="480" y="46" fill="#ff6b6b" font-size="12" text-anchor="end" font-weight="700">respin!</text>
+      </svg></div>
+      <div class="note">Every phase to the right multiplies the cost of a miss. DV pushes bug-discovery as far left as possible.</div>
+    </div>
+  </div>
+  ${foot('03 · Why verification')}
+</div>`);
+
+/* ---- 4. BIG PICTURE: THE CYCLE ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The big picture</div>
+  <h2 class="title">The verification cycle, <span class="hl">end to end</span></h2>
+  <div class="sub">A closed loop driven by one question: <i>"Have we exercised and checked everything the spec requires?"</i> Coverage answers it; the loop repeats until the answer is yes. The ten phases, in order: <b>spec → plan → testbench → stimulus → checking → coverage → regression → debug → closure → signoff.</b></div>
+  <div class="body"><div class="col card">
+    <div class="dg"><svg viewBox="0 0 1080 470" preserveAspectRatio="xMidYMid meet">${DEFS}
+      ${[
+        ['1','Spec &\\nfeature list',60],
+        ['2','Verification\\nplan',210],
+        ['3','TB architecture\\n(UVM env)',360],
+        ['4','Stimulus\\n(CRV)',510],
+        ['5','Checkers &\\ngolden model',660],
+        ['6','Functional\\ncoverage',810],
+        ['7','Regression',960]
+      ].map(([n,t,x],i)=>{
+        const y=90; const lines=t.split('\\n');
+        return `<rect x="${x-64}" y="${y}" width="128" height="70" rx="10" class="box"/>
+        <circle cx="${x-46}" cy="${y+18}" r="13" fill="#ff9900"/><text x="${x-46}" y="${y+23}" text-anchor="middle" fill="#0c1222" font-weight="800" font-size="14">${n}</text>
+        ${lines.map((l,li)=>`<text x="${x+8}" y="${y+22+li*15}" class="lbl" text-anchor="middle" font-size="12">${l}</text>`).join('')}
+        ${i<6?`<line x1="${x+64}" y1="${y+35}" x2="${x+86-64+64}" y2="${y+35}" class="flow"/>`:''}`;
+      }).join('')}
+      <rect x="360" y="300" width="360" height="70" rx="10" class="box" stroke="#ff9900"/>
+      <text x="540" y="330" class="lbl" text-anchor="middle" font-weight="700" fill="#ff9900">8 · Debug &amp; Root-Cause Analysis</text>
+      <text x="540" y="350" class="lbls" text-anchor="middle">classify failure → fix RTL / TB / spec</text>
+      <path d="M960 160 L960 335 L724 335" class="flowO"/>
+      <text x="980" y="250" class="lbls" transform="rotate(90 980 250)" text-anchor="middle">fails</text>
+      <path d="M360 335 L120 335 L120 300 Q120 250 210 200 L210 165" class="flow2"/>
+      <text x="150" y="285" class="lbls">close coverage gaps → new tests</text>
+      <rect x="770" y="300" width="230" height="70" rx="10" class="box" stroke="#39d98a"/>
+      <text x="885" y="330" class="lbl" text-anchor="middle" font-weight="700" fill="#39d98a">9 · Signoff</text>
+      <text x="885" y="350" class="lbls" text-anchor="middle">100% cov · clean regression</text>
+      <path d="M810 160 L810 250 L810 300" class="flow"/>
+    </svg></div>
+    <div class="legend">
+      <span><span class="sw" style="background:#ff9900"></span> forward build</span>
+      <span><span class="sw" style="background:#2bd4c4"></span> coverage-closure loop</span>
+      <span><span class="sw" style="background:#39d98a"></span> exit / signoff</span>
+    </div>
+  </div></div>
+  ${foot('04 · The cycle overview')}
+</div>`);
+
+/* ---- 4. WHAT IS DV: BLACK BOX ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">First principle</div>
+  <h2 class="title">Verification is <span class="hl">black-box observation</span></h2>
+  <div class="sub">The Device Under Test (DUT) is treated as a sealed box. The testbench drives its primary inputs, observes its primary outputs, and judges correctness against the specification — <i>never</i> by peeking at internal signals to decide what is "right."</div>
+  <div class="body">
+    <div class="col card">
+      <div class="dg"><svg viewBox="0 0 520 360" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <rect x="180" y="90" width="170" height="180" rx="12" fill="#1d2a49" stroke="#ff9900" stroke-width="2.5"/>
+        <text x="265" y="120" text-anchor="middle" fill="#ff9900" font-weight="800" font-size="16">DUT</text>
+        <text x="265" y="140" text-anchor="middle" class="lbls">(the design / RTL)</text>
+        <rect x="205" y="160" width="120" height="30" rx="5" fill="#16203a" stroke="#2b3a5e"/><text x="265" y="180" text-anchor="middle" class="lbls">reorder / commit</text>
+        <rect x="205" y="200" width="120" height="30" rx="5" fill="#16203a" stroke="#2b3a5e"/><text x="265" y="220" text-anchor="middle" class="lbls">internal engines</text>
+        <text x="265" y="255" text-anchor="middle" class="lbls" fill="#63769a">✗ TB does not model these</text>
+        <rect x="20" y="150" width="120" height="60" rx="9" fill="#123" stroke="#2bd4c4"/><text x="80" y="176" text-anchor="middle" fill="#2bd4c4" font-weight="700" font-size="13">Drive inputs</text><text x="80" y="194" text-anchor="middle" class="lbls">(stimulus)</text>
+        <path d="M140 180 L178 180" class="flow2"/>
+        <rect x="390" y="150" width="120" height="60" rx="9" fill="#123" stroke="#2bd4c4"/><text x="450" y="176" text-anchor="middle" fill="#2bd4c4" font-weight="700" font-size="13">Observe outputs</text><text x="450" y="194" text-anchor="middle" class="lbls">(read-only)</text>
+        <path d="M350 180 L388 180" class="flow2"/>
+        <text x="265" y="315" text-anchor="middle" class="lbl" fill="#fff">Only the boundary is observable: buses + control/status.</text>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Two rules that prevent most false results</h3>
+      <ul class="clean">
+        <li><b>Golden = spec, never observed RTL.</b> If you decide "correct" by reading what the design happens to output, you can only ever prove the design agrees with itself.</li>
+        <li><b>Judge at the boundary, on completion.</b> Internal transient states are the design's business; the contract lives at the pins.</li>
+      </ul></div>
+      <div class="card" style="margin-top:12px"><h3>Why "black box" is hard in general</h3>
+      <ul class="clean">
+        <li>This applies to <i>any</i> DUT — a DMA engine, a CPU, a memory controller, a protocol endpoint. Each drives many <b>transactions</b> <span class="def">(one atomic bus operation — a single read or write request/response)</span>.</li>
+        <li>Hardware legally <b>reorders</b> transactions for performance — the output you see may not be in the order you sent, yet still be correct.</li>
+        <li>The TB must <b>reconstruct intent</b> from boundary observations alone — reasoning about which <b>tap point</b> <span class="def">(where in the design a signal is observed)</span> a signal lives at.</li>
+      </ul></div>
+      ${ai('A reference model plus a large trace corpus is exactly the structured, checkable data a model learns from — inputs, legal outputs, and the invariant that ties them together. Note the invariant is order-independent and completion-gated: the label is a <b>relation</b>, not one golden string — a harder, more interesting learning target than a single expected output.')}
+    </div>
+  </div>
+  ${foot('05 · The DUT/TB boundary')}
+</div>`);
+
+/* ---- 5. PHASE 1 SPEC & PLANNING ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 1</div>
+  <h2 class="title">Specification &amp; <span class="hl">feature extraction</span></h2>
+  <div class="sub">Everything downstream is anchored to the spec: architecture manuals, protocol standards, and — critically — the register and <b>descriptor</b> <span class="def">(a small in-memory command record telling the engine what to move: source, destination, length)</span> formats that define what is <i>legal</i>. The first DV act is turning prose + diagrams into a structured <b>feature list</b>.</div>
+  <div class="body">
+    <div class="col card">
+      <div class="dg"><svg viewBox="0 0 520 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        ${[['Architecture\\nspec',40],['Protocol\\nstandard',40+150],['Register /\\ndescriptor\\nformats',40+300]].map(([t,x])=>{
+          const lines=t.split('\\n');return `<rect x="${x}" y="40" width="130" height="80" rx="10" class="box"/>${lines.map((l,i)=>`<text x="${x+65}" y="${68+i*17}" class="lbl" text-anchor="middle" font-size="12">${l}</text>`).join('')}<path d="M${x+65} 120 L260 170" class="flow"/>`;
+        }).join('')}
+        <rect x="150" y="170" width="220" height="56" rx="10" fill="#1d2a49" stroke="#ff9900" stroke-width="2"/>
+        <text x="260" y="195" text-anchor="middle" class="kbig">Feature List</text>
+        <text x="260" y="214" text-anchor="middle" class="lbls">each testable behavior, itemized</text>
+        <path d="M260 226 L260 262" class="flowO"/>
+        <rect x="150" y="262" width="220" height="52" rx="10" class="box"/>
+        <text x="260" y="285" text-anchor="middle" class="lbl">feeds → Verification Plan</text>
+        <text x="260" y="303" text-anchor="middle" class="lbls">(next phase)</text>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>What a feature entry captures</h3>
+      <ul class="clean">
+        <li><b>The behavior</b> (e.g. "descriptor with byte length 0 means max-size transfer").</li>
+        <li><b>Legality</b> — which field combinations are valid vs illegal.</li>
+        <li><b>Priority</b> and the spec citation it derives from.</li>
+      </ul></div>
+      <div class="card" style="margin-top:12px"><h3>A recurring trap</h3>
+      <ul class="clean">
+        <li>Diagrams carry meaning that <b>text extraction strips</b>. A byte-ordering figure or a state diagram is often <i>the</i> spec.</li>
+        <li>Miss the figure → build the wrong model → "pass" a broken design.</li>
+      </ul></div>
+      ${ai('Multimodal reading of specs (prose + tables + block/timing diagrams) is a natural, demonstrated model task — extracting a structured feature list, and surfacing <b>candidate</b> ambiguities for a human to reconcile. (Detecting a genuine contradiction needs cross-document grounding a model lacks — surface candidates, do not assert contradictions.)')}
+    </div>
+  </div>
+  ${foot('06 · Spec & planning')}
+</div>`);
+
+/* ---- 6. PHASE 2 TESTPLAN ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 2</div>
+  <h2 class="title">The verification plan <span class="hl">(testplan)</span></h2>
+  <div class="sub">The testplan is the contract of the whole effort: every feature maps to <b>stimulus</b> that exercises it, a <b>checker</b> that proves it, and <b>coverage</b> that measures it. Each row also names a general <i>check class</i>. Signoff = every row closed.</div>
+  <div class="body"><div class="col card">
+    <table class="matrix">
+      <tr><th>Feature (check class)</th><th>Stimulus</th><th>Checker (black-box)</th><th>Coverage</th><th>Status</th></tr>
+      <tr><td><b>Basic transfer</b> — copy N bytes A→B <span class="def">· data-integrity</span></td><td>random size, aligned</td><td>data match by address + <b>owner-ID</b> <span class="def">(a per-transaction ID the requester stamps, so a response matches back even when addresses are reused)</span></td><td>size bins</td><td style="color:var(--good)">✔ closed</td></tr>
+      <tr><td><b>Length=0 ⇒ max</b> <span class="def">· boundary-encoding</span></td><td>directed <span class="def">(a hand-written exact case)</span> + random</td><td>bytes moved = max</td><td>len bin {0}</td><td style="color:var(--good)">✔ closed</td></tr>
+      <tr><td><b>Out-of-order completion</b> <span class="def">· ordering-reassembly</span></td><td>many outstanding</td><td>order-independent match</td><td>reorder-depth cross <span class="def">(a "cross" tests two conditions together; defined on slide 19)</span></td><td style="color:var(--warn)">◐ partial</td></tr>
+      <tr><td><b>Back-pressure / stall</b> <span class="def">· flow-control</span></td><td>throttle receiver</td><td>no loss under stall</td><td>stall × size cross</td><td style="color:var(--bad)">○ gap</td></tr>
+      <tr><td><b>Illegal descriptor</b> <span class="def">· error-injection</span></td><td>constrained-illegal</td><td>error raised (status)</td><td>error-cause bins</td><td style="color:var(--bad)">○ gap</td></tr>
+    </table>
+    <div class="note">A living document: updated <b>in the same change</b> as the test/checker/coverage it describes — with the <i>measured</i> status, never an aspirational one. (Status glyphs: ✔ closed · ◐ partial · ○ gap.)</div>
+  </div>
+  <div class="col" style="flex:0 0 340px">
+    <div class="card"><h3>The three columns are inseparable</h3>
+    <ul class="clean">
+      <li><b>Stimulus without a checker</b> = you ran traffic and proved nothing.</li>
+      <li><b>Checker without coverage</b> = you cannot tell if it ever fired on the interesting case.</li>
+      <li><b>Coverage without a checker</b> = a green bin that verifies nothing (vacuous).</li>
+    </ul></div>
+    ${ai('Given a feature list + spec, a model can draft testplan rows for a human to review. Its <b>most reliable</b> move is hole-detection: a set-difference between the feature list and the coverage map flags every feature with no coverage mapping automatically — a near-deterministic consistency check.')}
+  </div></div>
+  ${foot('07 · Testplan')}
+</div>`);
+
+/* ---- 7. PHASE 3 UVM ENV ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 3</div>
+  <h2 class="title">Testbench architecture — a <span class="hl">layered test harness</span></h2>
+  <div class="sub">Think of it as a standard software test harness for hardware, in two halves: a <b>stimulus/observation half</b> (generate inputs, drive them onto the wires, passively record what comes back) and a <b>checking half</b> (a reference model predicts, a comparator judges Model-vs-RTL, coverage measures). The industry names these blocks <span class="def">(the roles form a "UVM agent" — NOT an AI agent, just a per-interface bundle of generator + driver + observer)</span>, but the concepts are the ones you already know from software testing.</div>
+  <div class="body"><div class="col card">
+    <div class="dg"><svg viewBox="0 0 1080 430" preserveAspectRatio="xMidYMid meet">${DEFS}
+      <rect x="20" y="20" width="1040" height="390" rx="14" fill="none" stroke="#2b3a5e" stroke-dasharray="5 5"/>
+      <text x="40" y="46" class="lbls" fill="#7aa2ff">TEST — picks config, sequences, seed</text>
+      <rect x="40" y="60" width="1000" height="330" rx="12" fill="#0f1830" stroke="#2b3a5e"/>
+      <text x="60" y="86" class="lbls" fill="#2bd4c4">ENVIRONMENT</text>
+      <rect x="70" y="100" width="250" height="270" rx="10" fill="#101c36" stroke="#2b3a5e"/>
+      <text x="195" y="124" text-anchor="middle" class="lbl" fill="#2bd4c4" font-weight="700">STIMULUS + OBSERVE (per interface)</text>
+      <rect x="95" y="140" width="200" height="46" rx="8" class="box"/><text x="195" y="163" text-anchor="middle" class="lbl">Input generator</text><text x="195" y="179" text-anchor="middle" class="lbls">(UVM: sequencer)</text>
+      <rect x="95" y="196" width="90" height="46" rx="8" class="box"/><text x="140" y="215" text-anchor="middle" class="lbl">Driver</text><text x="140" y="230" text-anchor="middle" class="lbls">onto wires</text>
+      <rect x="205" y="196" width="90" height="46" rx="8" class="box"/><text x="250" y="215" text-anchor="middle" class="lbl">Observer</text><text x="250" y="230" text-anchor="middle" class="lbls">(monitor)</text>
+      <text x="195" y="270" text-anchor="middle" class="lbls">generate → drive → DUT → observe</text>
+      <rect x="95" y="290" width="200" height="60" rx="8" fill="#16203a" stroke="#2b3a5e"/><text x="195" y="316" text-anchor="middle" class="lbls">input programs =</text><text x="195" y="334" text-anchor="middle" class="lbls">the test scenarios</text>
+      <rect x="360" y="150" width="150" height="170" rx="10" fill="#1d2a49" stroke="#ff9900" stroke-width="2.5"/>
+      <text x="435" y="240" text-anchor="middle" fill="#ff9900" font-weight="800" font-size="18">DUT</text>
+      <path d="M320 219 L358 219" class="flow2"/>
+      <rect x="560" y="100" width="460" height="270" rx="10" fill="#101c36" stroke="#2b3a5e"/>
+      <text x="790" y="124" text-anchor="middle" class="lbl" fill="#7aa2ff" font-weight="700">ANALYSIS / CHECKING</text>
+      <rect x="585" y="145" width="190" height="70" rx="8" fill="#123" stroke="#7aa2ff"/><text x="680" y="172" text-anchor="middle" fill="#7aa2ff" font-weight="700" class="lbl">Reference (golden) model</text><text x="680" y="192" text-anchor="middle" class="lbls">predicts expected result</text>
+      <rect x="805" y="145" width="190" height="70" rx="8" fill="#123" stroke="#2bd4c4"/><text x="900" y="168" text-anchor="middle" fill="#2bd4c4" font-weight="700" class="lbl">Comparator</text><text x="900" y="184" text-anchor="middle" class="lbls">Model vs RTL → pass/fail</text><text x="900" y="200" text-anchor="middle" class="lbls">(UVM: scoreboard)</text>
+      <rect x="585" y="235" width="410" height="55" rx="8" class="box"/><text x="790" y="258" text-anchor="middle" class="lbl">Protocol checkers &amp; assertions (SVA)</text><text x="790" y="278" text-anchor="middle" class="lbls">a rule that fires the instant a protocol condition breaks</text>
+      <rect x="585" y="305" width="410" height="50" rx="8" class="box"/><text x="790" y="335" text-anchor="middle" class="lbl">Functional coverage collectors</text>
+      <path d="M295 219 L358 219" class="flow2"/>
+      <path d="M510 200 C540 180 555 175 583 175" class="flow2"/>
+      <path d="M250 196 C260 100 560 90 680 143" class="flow"/>
+      <text x="470" y="95" class="lbls">monitored inputs → reference model</text>
+    </svg></div>
+    <div class="legend"><span><span class="sw" style="background:#ff9900"></span> DUT (design under test)</span><span><span class="sw" style="background:#2bd4c4"></span> stimulus + observe</span><span><span class="sw" style="background:#7aa2ff"></span> reference model + comparator</span></div>
+  </div></div>
+  ${foot('08 · UVM environment')}
+</div>`);
+
+/* ---- 8. UVM roles detail ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 3 · detail</div>
+  <h2 class="title">Who does what — in <span class="hl">software terms</span></h2>
+  <div class="sub">The roles map cleanly onto concepts you already use. Industry (UVM) names are in grey — you don't need them; the <i>function</i> is the point.</div>
+  <div class="body">
+    <div class="col">
+      <div class="two">
+        <div class="card"><h3>Input generator <span class="def">(sequencer + sequence)</span></h3><p class="small">Defines <b>what scenario</b> to run — a stream of request objects (e.g. 50 copies with random sizes). Like a parametric test-case generator.</p></div>
+        <div class="card"><h3>Driver <span class="def">(driver)</span></h3><p class="small">Turns each abstract request into the exact <b>signal-level activity on the wires</b>, per the bus timing rules. The only component that writes DUT inputs — the I/O adapter.</p></div>
+        <div class="card"><h3>Observer <span class="def">(monitor)</span></h3><p class="small">Passive. Watches the wires and reconstructs what happened <b>from observation only</b>, publishing it to the checker. Never drives — a read-only probe.</p></div>
+        <div class="card"><h3>Reference model <span class="def">(the golden model)</span></h3><p class="small">The independent <b>oracle</b>: given the same inputs, computes what a spec-correct design must produce. <b>Derived from spec — never fit to the design's own output</b> (a model that imitates the device could only ever agree with it). A fallible oracle, often owned by another team.</p></div>
+        <div class="card"><h3>Comparator <span class="def">(scoreboard)</span></h3><p class="small">Judges <b>Model vs RTL-design correctness</b>: binds each observed output to its expected value and <b>declares pass/fail</b>. Matches order-independently, gates on completion — like a diff that tolerates legal reordering.</p></div>
+        <div class="card"><h3>Coverage recorder <span class="def">(coverage collector)</span></h3><p class="small">Records <b>which interesting scenarios actually occurred</b> — the progress metric. Like instrumentation counting which branches of a huge input space were exercised.</p></div>
+      </div>
+      ${ai('Because these roles are standardized, a model can scaffold new stimulus generators, drivers/observers, and coverage from a protocol description — the boilerplate that consumes real engineer-days today. This is the most defensible economic claim in the deck: it is close to code-gen the current generation does well.')}
+    </div>
+  </div>
+  ${foot('09 · Component roles')}
+</div>`);
+
+/* ---- 9. DEPENDENCIES YOU DON'T OWN (NEW) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The dependency reality</div>
+  <h2 class="title">Your sign-off depends on things <span class="hl">you don't own</span></h2>
+  <div class="sub">A green testbench is not a solo artifact. It silently depends on a golden model, a firmware/driver layer, and third-party protocol VIP — each owned by someone else. "Is the test green?" quietly means "are <i>all</i> my dependencies correct <b>and</b> correctly configured?"</div>
+  <div class="body">
+    <div class="col card">
+      <div class="dg"><svg viewBox="0 0 560 360" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <ellipse cx="280" cy="180" rx="250" ry="150" fill="none" stroke="#2b3a5e" stroke-dasharray="4 6"/>
+        <line x1="130" y1="90"  x2="240" y2="160" class="flow"/>
+        <line x1="430" y1="90"  x2="320" y2="160" class="flow"/>
+        <line x1="430" y1="272" x2="320" y2="205" class="flow"/>
+        <line x1="130" y1="272" x2="240" y2="205" class="flow"/>
+        <rect x="195" y="152" width="170" height="56" rx="10" fill="#1d2a49" stroke="#ff9900" stroke-width="2.5"/>
+        <text x="280" y="176" text-anchor="middle" fill="#ff9900" font-weight="800" font-size="13">MY sign-off</text>
+        <text x="280" y="195" text-anchor="middle" class="lbls">(DUT verification)</text>
+        <rect x="20" y="60" width="200" height="56" rx="9" fill="#123" stroke="#7aa2ff"/><text x="120" y="82" text-anchor="middle" fill="#7aa2ff" font-weight="700" class="lbl">Golden model</text><text x="120" y="100" text-anchor="middle" class="lbls">another team · bug → false mismatch</text>
+        <rect x="340" y="60" width="200" height="56" rx="9" fill="#123" stroke="#2bd4c4"/><text x="440" y="82" text-anchor="middle" fill="#2bd4c4" font-weight="700" class="lbl">Firmware / HAL</text><text x="440" y="100" text-anchor="middle" class="lbls">shared w/ product SW · bug ships</text>
+        <rect x="340" y="248" width="200" height="56" rx="9" fill="#123" stroke="#c99bff"/><text x="440" y="270" text-anchor="middle" fill="#c99bff" font-weight="700" class="lbl">Third-party VIP</text><text x="440" y="288" text-anchor="middle" class="lbls">vendor, closed · bug → their turnaround</text>
+        <rect x="20" y="248" width="200" height="56" rx="9" fill="#0f2018" stroke="#39d98a"/><text x="120" y="270" text-anchor="middle" fill="#39d98a" font-weight="700" class="lbl">The testbench</text><text x="120" y="288" text-anchor="middle" class="lbls">mine · bug → my problem</text>
+        <text x="280" y="345" text-anchor="middle" class="lbls">dashed ring = "I depend on it but do NOT own it"</text>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Three ways to go red without a design bug</h3>
+      <ul class="clean">
+        <li><b>Reference (golden) model</b> — independent, spec-derived, often <b>another team's</b>. A model bug flags a mismatch though the design is fine: the red is real, the blame is misplaced.</li>
+        <li><b>Firmware/driver layer</b> — a <b>HAL</b> <span class="def">(hardware abstraction layer: the software that programs the device's registers, often shared with the production software stack)</span>. A HAL bug is a verification blocker <i>and</i> a customer-facing defect.</li>
+        <li><b>Third-party VIP</b> <span class="def">(Verification IP: a vendor's model of a standard protocol; you configure it, you do not own its source)</span> — a VIP bug carries a <b>vendor turnaround</b>, days to weeks, that you cannot compress.</li>
+      </ul></div>
+      <div class="card" style="margin-top:10px"><h3>The honest consequence</h3><p class="small">On a mature testbench, most "failures" are <b>not</b> design bugs. The engineer's first job on a red is <b>attribution</b> — which of N differently-owned components is at fault — before anyone touches the design.</p></div>
+      ${ai('Attribution/triage is a gradeable classification task: from a failure signature + logs + config, predict the at-fault component (design / golden / HAL / VIP / testbench) and localize it. Note the grader here is <b>historical human owner-labels</b>, NOT the deterministic simulator verdict used elsewhere — a weaker, <b>noisy/biased</b> reward (final owner after re-routing; bounced wrong-owner tickets mislabeled) — so evaluation must account for it. Fails today: models over-attribute to the most-visible component and skip proving the comparison was bound to the correct transaction.')}
+    </div>
+  </div>
+  ${foot('10 · Dependencies you rely on')}
+</div>`);
+
+/* ---- 10. OWNERSHIP CROSSES TEAM LINES (NEW) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">A leadership principle, made concrete</div>
+  <h2 class="title">Ownership crosses team lines: <span class="hl">drive it, don't file-and-forget</span></h2>
+  <div class="sub">A dependency bug that blocks <i>your</i> sign-off is still <i>yours</i> to close — you <b>route</b> it to the owner <b>and track</b> it as your own risk until resolved. "I filed a ticket, my part is done" is the failure mode: the hole stays open under your name while everyone assumes someone else is on it.</div>
+  <div class="body"><div class="col card">
+    <div class="dg"><svg viewBox="0 0 1080 300" preserveAspectRatio="xMidYMid meet">${DEFS}
+      <text x="40" y="40" class="lbl" fill="#2bd4c4" font-weight="700">ROUTE</text>
+      <rect x="40" y="55" width="150" height="52" rx="9" fill="#25121a" stroke="#ff6b6b"/><text x="115" y="86" text-anchor="middle" fill="#ff6b6b" class="lbl">red failure</text>
+      <path d="M190 81 L228 81" class="flow"/>
+      <rect x="228" y="55" width="180" height="52" rx="9" class="box"/><text x="318" y="78" text-anchor="middle" class="lbl">Attribution</text><text x="318" y="96" text-anchor="middle" class="lbls">which of {design,golden,HAL,VIP,TB}?</text>
+      <path d="M408 81 L446 81" class="flow"/>
+      <rect x="446" y="48" width="190" height="66" rx="9" fill="#101c36" stroke="#ffcc66"/><text x="541" y="72" text-anchor="middle" fill="#ffcc66" class="lbl">Provenance gate</text><text x="541" y="90" text-anchor="middle" class="lbls">bound to the correct txn?</text><text x="541" y="105" text-anchor="middle" class="lbls" fill="#ff6b6b">NO → loop: it is a mis-bind</text>
+      <path d="M636 81 L674 81" class="flow"/>
+      <rect x="674" y="55" width="180" height="52" rx="9" class="box"/><text x="764" y="78" text-anchor="middle" class="lbl">Draft report</text><text x="764" y="96" text-anchor="middle" class="lbls">in the OWNER's terms</text>
+      <path d="M854 81 L892 81" class="flow"/>
+      <rect x="892" y="55" width="150" height="52" rx="9" fill="#0f2018" stroke="#39d98a"/><text x="967" y="86" text-anchor="middle" fill="#39d98a" class="lbl">owner's queue</text>
+      <text x="40" y="185" class="lbl" fill="#ff9900" font-weight="700">TRACK (in parallel)</text>
+      <rect x="228" y="200" width="180" height="52" rx="9" fill="#241a08" stroke="#ff9900"/><text x="318" y="223" text-anchor="middle" fill="#ff9900" class="lbl">MY risk ledger</text><text x="318" y="241" text-anchor="middle" class="lbls">open item · status refreshed</text>
+      <path d="M318 200 L318 114" class="flowO"/>
+      <path d="M408 226 L892 226" class="flow" stroke-dasharray="6 5"/>
+      <rect x="892" y="200" width="150" height="52" rx="9" fill="#0f2018" stroke="#39d98a"/><text x="967" y="231" text-anchor="middle" fill="#39d98a" class="lbl">clears when verified</text>
+      <text x="650" y="218" class="lbls" fill="#ff6b6b">✗ route WITHOUT track = file-and-forget</text>
+    </svg></div>
+  </div>
+  <div class="col" style="flex:0 0 360px">
+    <div class="card"><h3>Prove attribution, don't assert it</h3>
+    <ul class="clean">
+      <li>Routing a bug to the right owner <i>is</i> the ownership work — and it starts with a technical proof that the failure is real, not a mis-binding.</li>
+      <li>The <b>interconnect</b> <span class="def">(the on-chip network/bus fabric carrying transactions between blocks)</span> may deliver responses in a <i>different order</i> than issued, for throughput — so pairing items by arrival order silently binds the wrong observed item to the wrong expected one. Mis-binding impersonates a real bug.</li>
+      <li><b>Provenance:</b> the oracle is the SPEC, never observed output. If the golden disagrees with the spec, the <i>model</i> is the bug — route it with a spec citation.</li>
+      <li>The test: "Would I put my name on this sign-off, in front of the design owner and architect, at the confidence I can defend?"</li>
+    </ul></div>
+    ${ai('A multi-agent / tool-use / attribution task with three separately-gradeable sub-steps: owner-attribution accuracy; a <b>provenance gate</b> the model must pass before it is allowed to blame (a process reward against premature attribution); and report quality (accepted-without-bounce — itself a noisy proxy, not ground truth). Limits: AI cannot fix closed VIP, cannot own the escalation/risk decision, and will confidently blame the most-visible owner without the gate.')}
+  </div></div>
+  ${foot('11 · Ownership crosses team lines')}
+</div>`);
+
+/* ---- 11. RUNNING EXAMPLE: DMA ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Running example</div>
+  <h2 class="title">Our DUT: a <span class="hl">DMA</span> data-movement engine</h2>
+  <div class="sub">A DMA (Direct Memory Access) engine moves large blocks of data between memories on behalf of compute, described by <b>descriptors</b>. It is the ideal teaching example: simple to state, genuinely hard to verify — and each hard property is a <i>transferable</i> challenge.</div>
+  <div class="body">
+    <div class="col card">
+      <div class="dg"><svg viewBox="0 0 520 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <rect x="30" y="130" width="110" height="80" rx="10" class="box"/><text x="85" y="165" text-anchor="middle" class="lbl">Source</text><text x="85" y="184" text-anchor="middle" class="lbls">memory</text>
+        <rect x="205" y="120" width="110" height="100" rx="12" fill="#1d2a49" stroke="#ff9900" stroke-width="2.5"/><text x="260" y="165" text-anchor="middle" fill="#ff9900" font-weight="800">DMA</text><text x="260" y="185" text-anchor="middle" class="lbls">read→move→write</text>
+        <rect x="380" y="130" width="110" height="80" rx="10" class="box"/><text x="435" y="165" text-anchor="middle" class="lbl">Dest</text><text x="435" y="184" text-anchor="middle" class="lbls">memory</text>
+        <path d="M140 170 L203 170" class="flow"/><path d="M317 170 L378 170" class="flow"/>
+        <rect x="205" y="40" width="110" height="46" rx="8" fill="#16203a" stroke="#2bd4c4"/><text x="260" y="60" text-anchor="middle" fill="#2bd4c4" class="lbl">Descriptor</text><text x="260" y="76" text-anchor="middle" class="lbls">addr,len,flags</text>
+        <path d="M260 86 L260 118" class="flow2"/>
+        <rect x="205" y="255" width="110" height="46" rx="8" fill="#16203a" stroke="#7aa2ff"/><text x="260" y="275" text-anchor="middle" fill="#7aa2ff" class="lbl">Completion</text><text x="260" y="291" text-anchor="middle" class="lbls">notification/IRQ</text>
+        <path d="M260 220 L260 253" class="flow"/>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Deceptively simple, actually hard</h3>
+      <ul class="clean">
+        <li><span class="tagchip">concurrency / OOO</span> issues <b>many transactions concurrently</b> and lets the interconnect reorder them — this is where <b>tap-point</b> reasoning bites.</li>
+        <li><span class="tagchip">completion-accounting</span> signals completion via <b>notifications</b> (per-packet completion signals; a <b>packet</b> is the full logical unit of a transfer, moved as a series of <b>beats</b> — one chunk per bus cycle) that must arrive in the right count.</li>
+        <li><span class="tagchip">input-legality</span> descriptors have <b>legal/illegal</b> field combos; some encodings (len=0) mean special things.</li>
+        <li><span class="tagchip">invisible transform</span> it can <b>merge, split, or transform</b> work internally with no visible boundary signal.</li>
+      </ul></div>
+      ${ai('A DMA verification environment is a compact, self-contained world: a bounded protocol, a clear golden model, rich corner cases, and objective pass/fail. That makes it excellent <b>training/eval data</b> — but it is also exactly why it may not transfer for free to messy system-level scenarios (see the breadth slides next).')}
+    </div>
+  </div>
+  ${foot('12 · The DMA example')}
+</div>`);
+
+/* ---- 12. SPECTRUM OF TB TYPES (NEW) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Breadth · 1 of 3</div>
+  <h2 class="title">The DV cycle spans a <span class="hl">spectrum of testbench types</span></h2>
+  <div class="sub">The running example is a <b>block</b> TB — the first of at least three scopes. Every scope runs the <i>same</i> ten-phase cycle; what changes is <b>which phase dominates</b> and which failure classes appear.</div>
+  <div class="body"><div class="col card">
+    <div class="dg"><svg viewBox="0 0 1080 320" preserveAspectRatio="xMidYMid meet">${DEFS}
+      ${[
+        ['BLOCK','one engine · clean golden model · bounded','#2bd4c4','dominant: data integrity + ordering',40],
+        ['SoC / INTEGRATION','many blocks wired together on one die','#7aa2ff','dominant: integration + system-scenario debug',140],
+        ['STANDARD-PROTOCOL IP','implements a die-to-die / interconnect / memory standard','#c99bff','dominant: standards compliance + vendor turnaround',240]
+      ].map(([name,desc,c,dom,y])=>`
+        <rect x="30" y="${y}" width="1020" height="80" rx="10" fill="#101c36" stroke="${c}"/>
+        <text x="52" y="${y+30}" class="lbl" fill="${c}" font-weight="700">${name}</text>
+        <text x="52" y="${y+50}" class="lbls">${desc}</text>
+        <text x="52" y="${y+68}" class="lbls" fill="#fff">${dom}</text>
+        ${[0,1,2,3,4,5,6,7,8,9].map(k=>`<circle cx="${560+k*46}" cy="${y+40}" r="${k===({BLOCK:4,'SoC / INTEGRATION':7,'STANDARD-PROTOCOL IP':6})[name]?11:6}" fill="${k===({BLOCK:4,'SoC / INTEGRATION':7,'STANDARD-PROTOCOL IP':6})[name]?c:'#2b3a5e'}"/>`).join('')}
+      `).join('')}
+      <text x="800" y="18" class="lbls" text-anchor="middle">the same 10 phases — one node enlarged = where the weight sits</text>
+    </svg></div>
+  </div>
+  <div class="col" style="flex:0 0 350px">
+    <div class="card"><h3>Same cycle, shifted weight</h3>
+    <ul class="clean">
+      <li><b>Block</b> — a clean golden model predicts every legal output; bounded, self-contained.</li>
+      <li><b>SoC</b> — <b>SoC = system-on-chip</b> (many blocks integrated on one die); new failure classes (e.g. address translation) that don't exist alone.</li>
+      <li><b>Protocol IP</b> — much checking done by third-party <b>VIP</b> you configure but don't own; work shifts to compliance + vendor turnaround.</li>
+    </ul>
+    <p class="small" style="margin-top:8px">Everything you learn on the block example is transferable — but a chip signs off only when all three scopes close.</p></div>
+    ${ai('Treat each TB type as a different RL/eval <b>world</b> sharing one action space (write stimulus, write checkers, root-cause) and one reward shape (test-green / coverage-rises / bug-reproduces). State space + dynamics differ sharply by scope: a model trained only on the cleanest world will not transfer for free to the fuzziest.')}
+  </div></div>
+  ${foot('13 · A spectrum of testbench types')}
+</div>`);
+
+/* ---- 13. SoC FAILURE CLASSES (NEW) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Breadth · 2 of 3</div>
+  <h2 class="title">SoC / integration: <span class="hl">new failure classes</span> that don't exist alone</h2>
+  <div class="sub">At block level, inputs and outputs live in one address space and one clock/reset regime the TB controls. Wire blocks together and bugs appear <b>in the seams</b> — invisible when each block is tested alone.</div>
+  <div class="body">
+    <div class="col card" style="flex:0 0 46%">
+      <div class="dg"><svg viewBox="0 0 520 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <rect x="60" y="150" width="400" height="40" rx="8" fill="#101c36" stroke="#7aa2ff"/><text x="260" y="175" text-anchor="middle" fill="#7aa2ff" class="lbl">interconnect fabric</text>
+        ${[['data-mover',80,'#ff9900'],['block B',200,'#2b3a5e'],['block C',320,'#2b3a5e'],['memory',440,'#2b3a5e']].map(([t,x,c])=>`<rect x="${x-40}" y="70" width="80" height="46" rx="8" fill="#1d2a49" stroke="${c}"/><text x="${x}" y="97" text-anchor="middle" class="lbls">${t}</text><line x1="${x}" y1="116" x2="${x}" y2="150" class="flow"/>`).join('')}
+        <text x="80" y="230" text-anchor="middle" fill="#ff6b6b" font-size="11">FC1 translation</text>
+        <text x="80" y="245" text-anchor="middle" class="lbls" font-size="10">local→physical, filter drops it</text>
+        <text x="210" y="230" text-anchor="middle" fill="#ffcc66" font-size="11">FC2 ordering</text>
+        <text x="210" y="245" text-anchor="middle" class="lbls" font-size="10">producer→consumer</text>
+        <text x="340" y="230" text-anchor="middle" fill="#c99bff" font-size="11">FC3 contention</text>
+        <text x="340" y="245" text-anchor="middle" class="lbls" font-size="10">shared port / credits</text>
+        <text x="440" y="230" text-anchor="middle" fill="#39d98a" font-size="11">FC4 scenarios</text>
+        <text x="440" y="245" text-anchor="middle" class="lbls" font-size="10">boot / reset / CDC</text>
+        <text x="260" y="300" text-anchor="middle" class="lbl" fill="#fff">bugs live in the seams, not in either block</text>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Four seam-only failure classes</h3>
+      <ul class="clean">
+        <li><b>FC1 · Address-space / translation mismatch.</b> At block level the HAL writes descriptors straight to the addresses the block reads — into a <b>ring buffer</b> <span class="def">(a fixed circular region of memory holding the queue of descriptors the engine pulls from)</span>. At SoC level those same writes pass through <b>address translation</b> to a different address space. A TB filter that recognized descriptors by the <i>local</i> ring-buffer address range now matches nothing — it silently drops every control write, the queue stays empty, and the engine stalls with zero warnings.</li>
+        <li><b>FC2 · Cross-block ordering.</b> Two blocks each obeying their own rules can still violate a <i>system</i> ordering requirement (a producer's completion must be <b>globally visible</b> — seen by all blocks — before a consumer starts).</li>
+        <li><b>FC3 · Shared resources / contention.</b> One interconnect, one memory port, one <b>credit pool</b> <span class="def">(credits = flow-control tokens; a sender may issue only while tokens remain)</span> → deadlock, starvation, priority inversion.</li>
+        <li><b>FC4 · System scenarios.</b> Boot, reset-mid-traffic, <b>clock-domain crossing</b> <span class="def">(a signal passing between two unsynchronized clocks — a notorious bug source)</span>, firmware reconfiguration.</li>
+      </ul></div>
+      ${ai('This is the <b>fuzziest</b> world for a model: reward is still objective (did the scenario pass?) but credit assignment is hard (long horizon, symptom far from cause, no single golden) and state is partially observable — closer to hard agentic RL than the crisp block world. A model helps here <b>later</b>, mostly at triage/clustering, not at authoring the oracle.')}
+    </div>
+  </div>
+  ${foot('14 · SoC-level failure classes')}
+</div>`);
+
+/* ---- 14. PHASE 4 STIMULUS / CRV ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 4</div>
+  <h2 class="title">Stimulus — <span class="hl">constrained-random</span> verification</h2>
+  <div class="sub">You cannot hand-write enough directed tests to hit 10⁹ states. Instead you define <b>constraints</b> (what is legal + what is interesting) and let a solver generate millions of <i>randomized-but-legal</i> transactions. Directed tests remain for specific corners.</div>
+  <div class="body">
+    <div class="col card">
+      <h3>The spectrum of stimulus</h3>
+      <div class="dg" style="height:200px"><svg viewBox="0 0 520 200" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <line x1="40" y1="120" x2="490" y2="120" stroke="#2b3a5e" stroke-width="2"/>
+        ${[['Directed',60,'one exact case','#7aa2ff'],['Constrained\\nrandom',230,'biased to corners','#2bd4c4'],['Pure random',420,'broad, shallow','#63769a']].map(([t,x,d,c])=>{const l=t.split('\\n');return `<circle cx="${x}" cy="120" r="8" fill="${c}"/>${l.map((s,i)=>`<text x="${x}" y="${90+i*15}" text-anchor="middle" class="lbl" font-size="12">${s}</text>`).join('')}<text x="${x}" y="150" text-anchor="middle" class="lbls">${d}</text>`;}).join('')}
+        <text x="60" y="180" text-anchor="middle" class="lbls">low volume</text>
+        <text x="420" y="180" text-anchor="middle" class="lbls">high volume</text>
+      </svg></div>
+      <div class="note">Good CRV uses <b>distributions</b> (weight toward min/max/boundary) and <b>solve-order</b> hints — not uniform randomness, which rarely hits corners.</div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>What constraints encode</h3>
+      <ul class="clean">
+        <li><b>Legality</b> — never generate a field combo the spec forbids (unless testing error handling).</li>
+        <li><b>Interest</b> — bias to boundaries: size 0, max size, back-to-back, max outstanding <span class="def">(issued-but-not-yet-completed transactions)</span>.</li>
+        <li><b>Reachability</b> — some cells are structurally impossible; exclude them explicitly.</li>
+      </ul></div>
+      <div class="card" style="margin-top:12px"><h3>Closure = CRV, not directed tests</h3>
+      <p class="small">Functional closure is achieved by <b>constraints + coverage sized to 100%</b>. A coverage miss is treated as a <i>constraint gap</i> to fix — not a directed test to bolt on.</p></div>
+      ${ai('Coverage-directed generation reframes closure as a search toward named empty bins — a <b>sparse-reward, expensive-oracle</b> problem where each candidate costs a full simulation, so sample-efficiency is the real challenge. More honest than "directed search", and more interesting to an ML audience.')}
+    </div>
+  </div>
+  ${foot('15 · Stimulus / CRV')}
+</div>`);
+
+/* ---- 15. PHASE 5 CHECKING ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 5</div>
+  <h2 class="title">Checking — <span class="hl">Model vs RTL</span> correctness</h2>
+  <div class="sub">Running traffic proves nothing without independent checking. Three layers: a reference model <i>predicts</i> the expected result, a <b>comparator</b> <span class="def">(UVM: scoreboard)</span> judges the design's output against it, and <b>assertions</b> <span class="def">(cycle-by-cycle protocol checks that fire the instant a required condition is violated)</span> guard the protocol every cycle.</div>
+  <div class="body"><div class="col card">
+    <div class="dg"><svg viewBox="0 0 1080 360" preserveAspectRatio="xMidYMid meet">${DEFS}
+      <rect x="40" y="150" width="140" height="60" rx="9" fill="#123" stroke="#2bd4c4"/><text x="110" y="185" text-anchor="middle" fill="#2bd4c4" class="lbl">Monitored inputs</text>
+      <path d="M180 180 L250 130" class="flow"/><path d="M180 180 L250 250" class="flow2"/>
+      <rect x="250" y="100" width="220" height="66" rx="10" fill="#123" stroke="#7aa2ff"/><text x="360" y="128" text-anchor="middle" fill="#7aa2ff" font-weight="700" class="lbl">Reference (golden) model</text><text x="360" y="148" text-anchor="middle" class="lbls">derived from SPEC → expected</text>
+      <rect x="250" y="220" width="220" height="66" rx="10" fill="#1d2a49" stroke="#ff9900"/><text x="360" y="248" text-anchor="middle" fill="#ff9900" font-weight="700" class="lbl">DUT</text><text x="360" y="268" text-anchor="middle" class="lbls">→ observed output</text>
+      <path d="M470 133 L560 175" class="flow"/><path d="M470 253 L560 195" class="flowO"/>
+      <rect x="560" y="145" width="200" height="80" rx="10" fill="#123" stroke="#2bd4c4"/><text x="660" y="178" text-anchor="middle" fill="#2bd4c4" font-weight="700" class="lbl">Comparator</text><text x="660" y="196" text-anchor="middle" class="lbls">bind &amp; compare</text><text x="660" y="212" text-anchor="middle" class="lbls">(UVM: scoreboard)</text>
+      <path d="M760 185 L840 155" class="flow"/><path d="M760 185 L840 215" class="flow"/>
+      <rect x="840" y="128" width="200" height="50" rx="9" fill="#0f2018" stroke="#39d98a"/><text x="940" y="158" text-anchor="middle" fill="#39d98a" font-weight="700" class="lbl">PASS — match</text>
+      <rect x="840" y="196" width="200" height="50" rx="9" fill="#25121a" stroke="#ff6b6b"/><text x="940" y="226" text-anchor="middle" fill="#ff6b6b" font-weight="700" class="lbl">FAIL — mismatch</text>
+    </svg></div>
+    <div class="note">The reference model is <b>derived from spec — never fit to observed DUT output</b>. A golden built by imitating the device could only ever agree with it (a useless check). And even a spec-derived golden is a <b>fallible verifier</b>: when it and the DUT disagree, either could be wrong — that is why RCA proves provenance rather than trusting the oracle blindly.</div>
+  </div></div>
+  ${foot('16 · Checking')}
+</div>`);
+
+/* ---- 16. CHECKER INVARIANTS ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 5 · doctrine</div>
+  <h2 class="title">Four invariants every checker <span class="hl">must honor</span></h2>
+  <div class="sub">Implementations change constantly; these principles do not. They separate a checker that catches real bugs from one that produces confident-but-wrong verdicts.</div>
+  <div class="body"><div class="col">
+    <div class="two">
+      <div class="card"><h3>1 · Match order-independently</h3><p class="small"><b>Because the same address gets reused, matching by address alone pairs the wrong items.</b> Bind each output to its request by <b>address + owner-ID</b> <span class="def">(a per-transaction/source ID the requester stamps)</span> — never by arrival order.</p></div>
+      <div class="card"><h3>2 · Gate on completion</h3><p class="small"><b>A half-finished transfer is not a wrong one.</b> Compare / release a result only after the packet is fully <b>assembled and its writes are done</b> — not when the first beat shows up.</p></div>
+      <div class="card"><h3>3 · Defer &amp; reorder</h3><p class="small"><b>Legal reordering must not look like a bug.</b> Hold out-of-order observations until the original issue order is <b>recoverable</b>. A <b>barrier</b> <span class="def">(an ordering fence forcing earlier ops to finish first)</span> makes this explicit; the mechanism varies, the requirement is doctrine.</p></div>
+      <div class="card"><h3>4 · Prove provenance before blaming</h3><p class="small"><b>Blaming the design on a mis-matched comparison wastes a designer's time.</b> A mismatch is a real bug <b>only if</b> you proved the observed data was bound to the <i>correct</i> transaction — mis-binding under reorder impersonates a bug.</p></div>
+    </div>
+    ${ai('These invariants are checkable rules — a recognition (static-analysis) task, one of the strongest model fits. A model reviewing a proposed checker can audit it against them: "does this compare by arrival order? does it gate on first-beat instead of completion?" Tap-point confusion is a <b>label-noise / credit-assignment</b> hazard: bind by transaction/source ID + completion, never by bus arrival.')}
+  </div></div>
+  ${foot('17 · Checker invariants')}
+</div>`);
+
+/* ---- 17. FALSE PASS / PITFALLS ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The dangerous failures</div>
+  <h2 class="title">A passing test is <span class="hl">not proof</span></h2>
+  <div class="sub">The scariest bugs in verification are in the <i>verification itself</i>: checks that pass while proving nothing. These four "false greens" let real design bugs escape — and, as a later slide shows, they are exactly the <b>reward hacks</b> an outcome-only grader incentivizes.</div>
+  <div class="body"><div class="col">
+    <div class="two">
+      <div class="card" style="border-color:#6b2e2e"><h3 style="color:#ff9a9a">Vacuous check</h3><p class="small">A rule <code>A ⇒ B</code> where <b>A almost never happens</b>. It "passes" every run — because it never actually evaluated B. Check the antecedent's firing rate (a zero-count is not a pass).</p></div>
+      <div class="card" style="border-color:#6b2e2e"><h3 style="color:#ff9a9a">Masked check</h3><p class="small">A comparison silenced by a config knob ("skip this field") added to quiet a failure — then quietly hiding real ones. Every mask needs a documented reason.</p></div>
+      <div class="card" style="border-color:#6b2e2e"><h3 style="color:#ff9a9a">Golden-from-device</h3><p class="small">The "expected" value was taken from what the design produced. Now the check can only confirm the design agrees with itself. It can never fail on a real bug.</p></div>
+      <div class="card" style="border-color:#6b2e2e"><h3 style="color:#ff9a9a">Coverage theater</h3><p class="small">Bins that auto-hit on <i>any</i> traffic, or crosses that prove nothing together. 95% coverage of the wrong things is 0% assurance.</p></div>
+    </div>
+    ${ai('Anti-pattern detection is a strong model fit — scan a diff for "was this mask added to silence a mismatch?", "does expected trace back to spec or to the device?". <b>Hold this thought:</b> these four false-greens are the reward hacks a naive "did it go green?" grader will discover — the Guardrails slide closes the arc.')}
+  </div></div>
+  ${foot('18 · False-pass pitfalls')}
+</div>`);
+
+/* ---- 18. PHASE 6 COVERAGE ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 6</div>
+  <h2 class="title">Functional coverage — <span class="hl">measuring progress</span></h2>
+  <div class="sub">Coverage answers "are we done?" objectively. It records which <b>interesting scenarios actually occurred</b> — not just which lines of code ran.</div>
+  <div class="body">
+    <div class="col card">
+      <h3>Coverpoints, bins, crosses</h3>
+      <div class="dg" style="height:230px"><svg viewBox="0 0 520 230" preserveAspectRatio="xMidYMid meet">
+        <text x="20" y="30" class="lbl" fill="#2bd4c4">coverpoint: transfer size</text>
+        ${[['0',60,'#39d98a'],['1-16',130,'#39d98a'],['17-64',200,'#39d98a'],['max',270,'#ff6b6b']].map(([t,x,c])=>`<rect x="${x}" y="45" width="60" height="26" rx="5" fill="#16203a" stroke="${c}"/><text x="${x+30}" y="63" text-anchor="middle" class="lbls">${t}</text>`).join('')}
+        <text x="345" y="63" class="lbls" fill="#ff6b6b">← empty bin = gap</text>
+        <text x="20" y="110" class="lbl" fill="#2bd4c4">coverpoint: back-pressure</text>
+        ${[['none',60,'#39d98a'],['light',130,'#39d98a'],['heavy',200,'#ffcc66']].map(([t,x,c])=>`<rect x="${x}" y="125" width="60" height="26" rx="5" fill="#16203a" stroke="${c}"/><text x="${x+30}" y="143" text-anchor="middle" class="lbls">${t}</text>`).join('')}
+        <text x="20" y="185" class="lbl" fill="#7aa2ff">cross: size × back-pressure</text>
+        <text x="20" y="208" class="lbls">the interaction — "max size under heavy stall" — is the real corner</text>
+      </svg></div>
+      <div class="note">Crosses matter most: individual bins can be full while their <b>interaction</b> was never tested.</div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Two kinds of coverage</h3>
+      <ul class="clean">
+        <li><b>Code coverage</b> (lines, <b>toggles</b> <span class="def">(did a signal switch 0→1 and 1→0)</span>, <b>FSM</b> <span class="def">(finite-state-machine)</span> states) — necessary, cheap, but shallow: "did this line run?"</li>
+        <li><b>Functional coverage</b> — engineer-defined intent: "did we test max-size transfer while stalled and reordered?" This is the real target.</li>
+      </ul></div>
+      <div class="card" style="margin-top:12px"><h3>Illegal ≠ uncovered</h3>
+      <p class="small">Spec-illegal combinations get <b>illegal_bins</b> (fail if hit), not empty coverage. Structurally-impossible cells get <b>ignore_bins</b> — with a comment saying why.</p></div>
+      ${ai('A model can propose coverpoints/crosses from the feature list, and — powerfully — reason about which empty bins are <b>reachable</b> vs structurally impossible, saving the engineer from chasing un-hittable cells. (Reachability is undecidable in general, so hedge it — a hard analysis, not boilerplate.)')}
+    </div>
+  </div>
+  ${foot('19 · Functional coverage')}
+</div>`);
+
+/* ---- 19. PHASE 7 REGRESSION ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 7</div>
+  <h2 class="title">Regression — <span class="hl">scale &amp; automation</span></h2>
+  <div class="sub">One test on one seed proves little. Confidence comes from running <b>thousands of tests × many seeds</b> <span class="def">(each seed = a different random path)</span> nightly on a <b>compute farm</b> <span class="def">(a shared cluster)</span>, and from re-running the suite on every change: a fast <b>smoke</b> gate, then the full <b>nightly</b>.</div>
+  <div class="body"><div class="col card">
+    <div class="dg"><svg viewBox="0 0 1080 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+      <rect x="40" y="140" width="150" height="60" rx="9" class="box"/><text x="115" y="168" text-anchor="middle" class="lbl">Design change</text><text x="115" y="186" text-anchor="middle" class="lbls">(RTL or TB)</text>
+      <path d="M190 170 L250 170" class="flow"/>
+      <rect x="250" y="120" width="150" height="100" rx="10" fill="#101c36" stroke="#2bd4c4"/><text x="325" y="150" text-anchor="middle" fill="#2bd4c4" font-weight="700" class="lbl">Smoke</text><text x="325" y="172" text-anchor="middle" class="lbls">minutes · gate</text><text x="325" y="192" text-anchor="middle" class="lbls">"did I break basics?"</text>
+      <path d="M400 170 L460 170" class="flow"/>
+      <rect x="460" y="100" width="180" height="140" rx="10" fill="#101c36" stroke="#7aa2ff"/><text x="550" y="130" text-anchor="middle" fill="#7aa2ff" font-weight="700" class="lbl">Nightly regression</text><text x="550" y="155" text-anchor="middle" class="lbls">1000s of tests</text><text x="550" y="175" text-anchor="middle" class="lbls">× many seeds</text><text x="550" y="200" text-anchor="middle" class="lbls">compute farm</text><text x="550" y="222" text-anchor="middle" class="lbls">+ coverage merge</text>
+      <path d="M640 170 L700 170" class="flow"/>
+      <rect x="700" y="120" width="150" height="100" rx="10" class="box"/><text x="775" y="155" text-anchor="middle" class="lbl">Results</text><text x="775" y="177" text-anchor="middle" class="lbls">pass / fail</text><text x="775" y="197" text-anchor="middle" class="lbls">+ coverage %</text>
+      <path d="M850 150 L920 110" class="flow"/><path d="M850 190 L920 230" class="flow"/>
+      <rect x="920" y="85" width="140" height="46" rx="8" fill="#0f2018" stroke="#39d98a"/><text x="990" y="113" text-anchor="middle" fill="#39d98a" class="lbl">clean → merge</text>
+      <rect x="920" y="205" width="140" height="46" rx="8" fill="#25121a" stroke="#ff6b6b"/><text x="990" y="233" text-anchor="middle" fill="#ff6b6b" class="lbl">fails → triage</text>
+    </svg></div>
+    <div class="note">Different seeds explore different random paths — a bug may appear on 1 seed in 50. Seed diversity is coverage in disguise. <b>Coverage merge</b> = combining every run's coverage into one database.</div>
+  </div></div>
+  ${foot('20 · Regression')}
+</div>`);
+
+/* ---- 20. RCA METHOD (REPLACES orig 17) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 8 · method</div>
+  <h2 class="title">Root-causing a failure — the <span class="hl">disciplined method</span></h2>
+  <div class="sub">A failure is a claim to be <i>adjudicated</i>, not a symptom to be patched. Root-cause is a structured reasoning harness with verifiable gates, run in a fixed order — this is how a DV engineer actually thinks.</div>
+  <div class="body">
+    <div class="col card" style="flex:0 0 44%">
+      <div class="dg"><svg viewBox="0 0 460 360" preserveAspectRatio="xMidYMid meet">${DEFS}
+        ${[['1 · Error signature','#ffcc66',20],['2 · Spec contract = independent golden','#7aa2ff',75],['3 · Classify into 4 buckets','#2bd4c4',130],['4 · Multi-layer trace','#2bd4c4',185],['5 · Hypothesis','#2bd4c4',240],['6 · Fix + re-verify','#39d98a',295]].map(([t,c,y])=>`
+          <rect x="30" y="${y}" width="300" height="42" rx="8" fill="#101c36" stroke="${c}"/>
+          <text x="180" y="${y+26}" text-anchor="middle" class="lbl" fill="${c}">${t}</text>
+          <rect x="336" y="${y+10}" width="22" height="22" rx="4" fill="#16203a" stroke="#63769a"/><text x="347" y="${y+26}" text-anchor="middle" font-size="12" fill="#ffcc66">🔒</text>
+        `).join('')}
+        ${[62,117,172,227,282].map(y=>`<path d="M180 ${y} L180 ${y+13}" class="flow"/>`).join('')}
+        <text x="410" y="30" class="lbls" transform="rotate(90 410 30)">GATE: cannot advance until met</text>
+        <line x1="20" y1="20" x2="20" y2="337" stroke="#ff9900" stroke-dasharray="3 4"/>
+        <text x="14" y="180" class="lbls" transform="rotate(-90 14 180)" text-anchor="middle" fill="#ff9900">GROUND TRUTH = waveform (log is a proxy)</text>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>The rules, in order</h3>
+      <ul class="clean">
+        <li><b>Spec is the only golden.</b> Derive expected independently from the spec — never read it back from the device output or copy it from RTL. Either is circular. (A data-mover may legally return read data <i>out of order</i>; reconstruct the intended result from the spec, not "correct because the device produced it.")</li>
+        <li><b>Classify before you blame</b> — exactly one of: illegal stimulus / testbench-check bug / reference-model gap / real design bug. On a mature TB the TB is the <i>likelier</i> culprit; conclude "design bug" only after ruling out the three TB-side buckets with evidence.</li>
+        <li><b>Ground truth is the waveform</b>, not the log summary (the TB's interpretation). When they disagree, the waveform wins; opening it is mandatory for any mismatch or hang.</li>
+        <li><b>Error location ≠ bug location.</b> Trace symptom→leaf across every layer (test → firmware → interconnect → device → checker). The cause <i>emerges</i> from the trace.</li>
+      </ul></div>
+      ${ai('A structured decision procedure with checkable intermediate artifacts — ideal for <b>process-supervised</b> training (reward the correct step, not just the final label) and tool-use tracing (the trace IS the chain of tool calls). Fails today: strong <b>anchoring/completion bias</b> — latch onto the first plausible story and "blame the design" because that ends the task, skipping the harder TB-side rule-outs; and will set golden = observed output unless a hard grounding gate forbids it. The gates are structural — they change what step is even allowed next.')}
+    </div>
+  </div>
+  ${foot('21 · RCA — the disciplined method')}
+</div>`);
+
+/* ---- 21. PROVENANCE & EARNED CONFIDENCE (REPLACES orig 18) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 8 · trust</div>
+  <h2 class="title">The cardinal rule: <span class="hl">provenance + challenge</span></h2>
+  <div class="sub">One rule underlies trustworthy RCA. Before any value enters a conclusion: (1) <b>Provenance</b> — name where it came from (its authoritative source); if you cannot, it is an <i>inference</i>, label it so. (2) <b>Challenge</b> — name the concrete case where it would be FALSE, and rule that out <i>before</i> building on it. Everything below is that rule applied.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card"><h3>Provenance means: use each source in its right role</h3>
+      <p class="small">The most common wrong root-cause is <i>one source used in the wrong role</i> — above all, deriving the "expected" answer from the device's own output.</p>
+      <table class="matrix" style="margin-top:8px">
+        <tr><th>Source</th><th>Its role — and only that role</th></tr>
+        <tr><td><b>Specification</b></td><td>AUTHORITY — the golden derives <i>only</i> here</td></tr>
+        <tr><td><b>Design source (RTL)</b></td><td>CONFORMANCE — checked <i>against</i> spec, never the golden's source</td></tr>
+        <tr><td><b>Reference model</b></td><td>a second golden only if genuinely in the check path</td></tr>
+        <tr><td><b>Waveform</b></td><td>GROUND TRUTH · <b>Log</b> = a proxy view only</td></tr>
+      </table>
+      <div class="note" style="color:#ff9a9a">Device output → golden = circular. Forbidden.</div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Challenge means: earn your confidence</h3>
+      <ul class="clean">
+        <li><b>Rule out the simplest alternative</b> with direct evidence; then a <i>separate</i> reviewer (fresh context) re-challenges — this <i>reduces, not eliminates</i> self-ratification; the byte-level evidence is the final arbiter.</li>
+        <li><b>Confidence is calibrated:</b> HIGH only when that alternative is ruled out AND (for a mismatch) the waveform was actually analyzed — capturing ≠ analyzing. Else MEDIUM/LOW, with the unknown named.</li>
+        <li><b>The accountability test:</b> "Would I put my name on this at the <b>tape-out gate</b>?" A bug is not closed until it earns a new coverage point <i>and</i> the fix is proven not to have masked the symptom.</li>
+      </ul></div>
+      ${ai('Provenance+Challenge is a verifiable-reward + grounding harness made explicit — "cite the authoritative source and name the falsifying case" is a checkable rubric. Author-vs-reviewer maps to debate/self-critique with a distinct critic; calibrated confidence with a named residual unknown = selective prediction / abstention. Fails today: models are systematically <b>overconfident</b> and produce fluent, plausible provenance for values they guessed — hence a <b>separate</b> reviewer and hard "no golden from device" gates. Train the provenance and rule-outs, not just the final label, or you train a confident circular reasoner.')}
+    </div>
+  </div>
+  ${foot('22 · Provenance & earned confidence')}
+</div>`);
+
+/* ---- 22. HOW MODELS FAIL AT RCA (NEW) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The honest pain-points</div>
+  <h2 class="title">How today's models <span class="hl">fail at root-cause</span></h2>
+  <div class="sub">Root-causing means explaining a <b>coupled system</b> (stimulus, golden model, checker, device) from one error message far downstream. A model that reasons one component at a time thrashes, misattributes, and quietly games the check.</div>
+  <div class="body">
+    <div class="col card" style="flex:0 0 40%">
+      <div class="dg"><svg viewBox="0 0 420 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        ${[['Stimulus',60],['Golden / reference',115],['Checker',170],['Device',225]].map(([t,y])=>`<rect x="120" y="${y}" width="180" height="38" rx="8" class="box"/><text x="210" y="${y+24}" text-anchor="middle" class="lbl">${t}</text>`).join('')}
+        <rect x="120" y="285" width="180" height="38" rx="8" fill="#25121a" stroke="#ff6b6b"/><text x="210" y="309" text-anchor="middle" fill="#ff6b6b" class="lbl">ERROR prints here</text>
+        <path d="M210 285 L210 264" class="flowR"/><path d="M210 225 L210 209" class="flow"/><path d="M210 170 L210 154" class="flow"/><path d="M210 115 L210 99" class="flow"/>
+        <text x="330" y="305" class="lbls" fill="#ff6b6b">upstream ≠</text>
+        <path d="M300 244 C360 244 360 150 305 135" fill="none" stroke="#ff6b6b" stroke-width="2" marker-end="url(#arrR)"/>
+        <text x="392" y="190" class="lbls" transform="rotate(90 392 190)" fill="#ff6b6b">golden-from-device (circular)</text>
+        <text x="60" y="150" class="lbls" transform="rotate(-90 60 150)" fill="#ffcc66">trace UPSTREAM to the leaf</text>
+      </svg></div>
+      <div class="note">Error location is not bug location.</div>
+    </div>
+    <div class="col">
+      <div class="two">
+        <div class="card"><h3 style="color:#ff9a9a">FM1 · Thrashing</h3><p class="small">Hypothesize→edit→re-run→same error→reverse→repeat. A real case took <b>4 iterations, 3 wrong root causes</b> — each component analyzed in isolation; the true fault was a <b>dropped descriptor</b> upstream, so every checker fix was doomed. = premature convergence / no credit assignment.</p></div>
+        <div class="card"><h3 style="color:#ff9a9a">FM2 · Missing blast radius</h3><p class="small">To fix feature A the model edits a <b>shared</b> checker, greps only A's keyword, ignores other consumers; A goes green, B silently breaks. = optimizing the visible local reward while corrupting unmodeled global state.</p></div>
+        <div class="card"><h3 style="color:#ff9a9a">FM3 · Easy-blame</h3><p class="small">Jumps to "design bug" before exhausting the far-likelier TB-side causes; wastes an escalation, erodes trust. = miscalibrated prior / attribution shortcut.</p></div>
+        <div class="card"><h3 style="color:#ff9a9a">FM4 · Golden-from-device</h3><p class="small"><b>The reward hack.</b> Builds "expected" from what the device produced, declares a match — grades the device against itself. Most dangerous: a confident PASS on a real bug.</p></div>
+      </div>
+      ${ai('Helps: match a fresh signature to a library of past root-causes, draft the mechanical trace, propose candidate hypotheses — genuine triage acceleration. Fails: the coupled-system credit assignment above — long-horizon reasoning + calibration gaps, not prompt-tuning gaps. Do NOT deploy an autonomous auto-fix against a checker without the structural gates on the next slide; an objective-yet-gameable grader actively rewards the wrong behaviors.')}
+    </div>
+  </div>
+  ${foot('23 · How models fail at RCA')}
+</div>`);
+
+/* ---- 23. REWARD-HACKING ARC (NEW) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The reward-hacking arc</div>
+  <h2 class="title">The model needn't fool the simulator — <span class="hl">only change what it is asked to check</span></h2>
+  <div class="sub">The four dangerous false-greens from earlier are <i>exactly</i> the actions an outcome-only grader ("did it go green?") incentivizes. The exploit is not fooling the checker; it is <b>weakening what gets checked</b>. Give a model only that reward and it finds the cheapest green — so we reward the reasoning <b>process</b>, not just the green.</div>
+  <div class="body"><div class="col card">
+    <table class="matrix">
+      <tr><th>Reward hack (false-green)</th><th>Structural gate / mitigation</th></tr>
+      <tr><td><b>Vacuous check</b> — never fired</td><td>Reachability / firing-count gate — a zero-count is not a pass</td></tr>
+      <tr><td><b>Masked check</b> — disabled to pass</td><td>No-masking rule — classify &amp; fix the cause, never silence</td></tr>
+      <tr><td><b>Golden-from-device</b> — circular</td><td>Provenance gate — golden derives from spec only</td></tr>
+      <tr><td><b>Coverage theater</b> — hollow metric</td><td>Meaningful-coverage gate — bins must map to real scenarios</td></tr>
+      <tr><td><b>Silent cross-feature break</b></td><td>Blast-radius gate — enumerate ALL consumers before editing a shared symbol</td></tr>
+      <tr><td><b>Easy-blame / thrashing</b></td><td>Exhaust-TB-first prior + belief-update on contradicting evidence</td></tr>
+    </table>
+    <div class="note">Plus two <b>process rewards</b>: reward correctly <i>refusing to mask</i>, and reward <i>retracting a wrong theory</i> on contradicting evidence.</div>
+  </div>
+  <div class="col" style="flex:0 0 350px">
+    <div class="card"><h3>The grader is strong — but gameable</h3>
+    <p class="small">It is a <b>deterministic simulator</b> checking a spec-derived golden — a <b>verifiable reward</b>, far less exploitable than an RLHF preference model (no learned reward-model to over-optimize). But "deterministic" ≠ "safe": any programmatic reward is still <b>Goodhart-able</b> — optimize the measured proxy, not the intent. "Change what is checked" is one instance. So robust reward design is part of the work, not a detail.</p></div>
+    <div class="card" style="margin-top:8px"><h3>The honest cost</h3>
+    <p class="small">The high-value signal is the <b>reasoning trace including retracted dead-ends</b> — scarce, and must be deliberately <b>built</b> (a data-pipeline cost plausibly larger than the modeling). Terminal rewards (bug reproduced, hole closed) are <b>sparse and long-horizon</b>; process rewards make that horizon learnable.</p></div>
+    ${ai('Gates close the <b>known</b> reward hacks; unknown ones need ongoing red-teaming — this is not completeness. The harness constrains behavior but does not supply the scarce traces or shorten the sparse credit path (the dominant costs). A verifiable simulator reward beats RLHF preferences yet is not self-protecting: someone must design the reward so that changing <i>what is checked</i> is not the cheapest path to green.')}
+  </div></div>
+  ${foot('24 · The reward-hacking arc')}
+</div>`);
+
+/* ---- NEW: LLM in DV — greenfield vs brownfield ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">LLM in the DV cycle · what we learned</div>
+  <h2 class="title">Greenfield vs brownfield — <span class="hl">where an LLM is reliable</span></h2>
+  <div class="sub">Two real LLM-assisted verification efforts, same model, opposite starting points. The lesson: a model is far more reliable <b>inheriting a verified scaffold</b> than <b>authoring one and grading its own progress</b>. When it writes the plan <i>and</i> reports against it, the plan silently becomes a status claim reality cannot back.</div>
+  <div class="body">
+    <div class="col card">
+      <div class="dg"><svg viewBox="0 0 520 360" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <rect x="20" y="30" width="230" height="300" rx="12" fill="#0f2018" stroke="#39d98a"/>
+        <text x="135" y="56" text-anchor="middle" fill="#39d98a" font-weight="700" class="lbl">BROWNFIELD</text>
+        <text x="135" y="74" text-anchor="middle" class="lbls">inherit a mature scaffold</text>
+        <rect x="40" y="90" width="190" height="70" rx="8" class="box"/><text x="135" y="112" text-anchor="middle" class="lbls">verified doctrine +</text><text x="135" y="128" text-anchor="middle" class="lbls">fixed invariants +</text><text x="135" y="144" text-anchor="middle" class="lbls">mandatory procedure</text>
+        <path d="M135 160 L135 186" class="flow"/>
+        <rect x="40" y="188" width="190" height="46" rx="8" fill="#123" stroke="#39d98a"/><text x="135" y="216" text-anchor="middle" fill="#39d98a" class="lbl">external gate catches drift</text>
+        <text x="135" y="268" text-anchor="middle" class="lbls">model drifted (reversed 4×)</text>
+        <text x="135" y="286" text-anchor="middle" class="lbls">— gate caught every drift;</text>
+        <text x="135" y="304" text-anchor="middle" class="lbls" fill="#fff">never filed a false bug</text>
+        <rect x="270" y="30" width="230" height="300" rx="12" fill="#25121a" stroke="#ff6b6b"/>
+        <text x="385" y="56" text-anchor="middle" fill="#ff6b6b" font-weight="700" class="lbl">GREENFIELD</text>
+        <text x="385" y="74" text-anchor="middle" class="lbls">author the scaffold</text>
+        <rect x="290" y="90" width="190" height="70" rx="8" fill="#101c36" stroke="#ff6b6b" stroke-dasharray="4 3"/><text x="385" y="108" text-anchor="middle" class="lbls">spec-Qs → plan →</text><text x="385" y="124" text-anchor="middle" class="lbls">architecture → status</text><text x="385" y="144" text-anchor="middle" fill="#ff6b6b" class="lbls">policy == grader (loop)</text>
+        <path d="M385 160 L385 186" class="flowR"/>
+        <rect x="290" y="188" width="190" height="100" rx="8" fill="#16203a" stroke="#ff6b6b"/><text x="385" y="210" text-anchor="middle" fill="#ff6b6b" class="lbls">overstated completion</text><text x="385" y="228" text-anchor="middle" class="lbls">55 named / 13 exist / 5 pass</text><text x="385" y="248" text-anchor="middle" fill="#ff6b6b" class="lbls">vacuous / inert checks</text><text x="385" y="266" text-anchor="middle" class="lbls">disagreeing status docs</text>
+        <text x="385" y="312" text-anchor="middle" class="lbls">external audit re-scores</text>
+        <text x="385" y="328" text-anchor="middle" class="lbls">from runnable files only</text>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Greenfield surfaces distinct failure modes</h3>
+      <ul class="clean">
+        <li><b>Completion overstatement.</b> The plan named ~55 tests; only ~13 existed as runnable files; only ~5 of ~72 tapeout-gating features were closed by a genuinely <i>passing</i> test. The rest were "paper entries" — a feature looked covered because it pointed at a test never built. <b>The plan is a PLAN, not a status.</b></li>
+        <li><b>Inert / vacuous coverage.</b> Groups existed but were off-by-default or single-test-only, or could never fire (a fullness check run un-saturated). Counted ≠ exercised.</li>
+        <li><b>What caught it:</b> a dedicated <b>honest-audit pass</b> that recomputed status ONLY from real runnable artifacts, was empowered to reverse the author, and forced every item to binary DONE (a passing test exists) or BLOCKED (a filed defect). Verify-then-claim, never name-then-claim.</li>
+      </ul></div>
+      ${ai('Never let the generator be its own grader. Score completion only on verifiable artifacts (does a real test pass?), and put the verifier OUTSIDE the agent that authored the plan. ML mapping: a mature scaffold acts like verifier-constrained generation with a strong inductive prior — a dense, well-shaped signal that keeps the policy honest. Greenfield is open-ended generation where the model authors the oracle AND the answer; with no independent signal it defaults optimistic — the same reason RLHF separates policy from reward model, and LLM-as-judge needs an independent judge. Not deception: absent an external check it defaulted optimistic, which is exactly why the check is the fix.')}
+    </div>
+  </div>
+  ${foot('25 · LLM: greenfield vs brownfield')}
+</div>`);
+
+/* ---- NEW: LLM in DV — guessed-premise blast radius ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">LLM in the DV cycle · what we learned</div>
+  <h2 class="title">A guessed premise <span class="hl">poisons everything downstream</span></h2>
+  <div class="sub">In greenfield the spec itself is unsettled, so the model cannot just "read the spec and build the oracle." Its limit is <b>authority, not comprehension</b>: it detects ambiguity brilliantly but cannot resolve it — and a wrong guess anchoring a <b>shared</b> check fails the whole suite silently, not one test.</div>
+  <div class="body"><div class="col card">
+    <div class="dg"><svg viewBox="0 0 1080 300" preserveAspectRatio="xMidYMid meet">${DEFS}
+      <rect x="30" y="120" width="210" height="70" rx="10" fill="#16203a" stroke="#ff6b6b"/><text x="135" y="150" text-anchor="middle" fill="#ff6b6b" class="lbl">Ambiguous spec value</text><text x="135" y="170" text-anchor="middle" class="lbls">the model GUESSES a default</text>
+      <path d="M240 155 L300 155" class="flowR"/><text x="270" y="145" text-anchor="middle" class="lbls">anchors</text>
+      <rect x="300" y="115" width="220" height="80" rx="10" fill="#1d2a49" stroke="#ffcc66"/><text x="410" y="145" text-anchor="middle" fill="#ffcc66" class="lbl">SHARED oracle</text><text x="410" y="165" text-anchor="middle" class="lbls">"safe to compare now?"</text><text x="410" y="183" text-anchor="middle" class="lbls">every test depends on it</text>
+      ${[0,1,2,3,4,5,6].map(k=>`<rect x="${560+k*70}" y="70" width="60" height="34" rx="6" fill="#0f2018" stroke="#39d98a"/><text x="${590+k*70}" y="92" text-anchor="middle" fill="#39d98a" class="lbls">PASS</text>`).join('')}
+      ${[0,1,2,3,4,5,6].map(k=>`<path d="M520 155 L${588+k*70} 104" class="flow" opacity="0.5"/>`).join('')}
+      <rect x="560" y="66" width="${7*70-10}" height="42" rx="8" fill="none" stroke="#ff6b6b" stroke-width="2"/>
+      <text x="${560+ (7*70-10)/2}" y="132" text-anchor="middle" fill="#ff6b6b" font-weight="700" class="lbl">FALSE PASS — all of them</text>
+      <text x="410" y="240" text-anchor="middle" class="lbls">one wrong premise → the whole suite silently goes green</text>
+      <text x="820" y="270" text-anchor="middle" class="lbls" fill="#7aa2ff">RCA evidence-gates → see slide 23</text>
+    </svg></div>
+  </div>
+  <div class="col" style="flex:0 0 360px">
+    <div class="card"><h3>The disciplined pattern the LLM followed</h3>
+    <ul class="clean">
+      <li><b>Surface</b> the contradiction as a cited question to the human spec owner (a cross-document conflict a human skimming one doc would miss).</li>
+      <li><b>Size the blast radius</b> — flag it the #1 spec risk precisely <i>because</i> it feeds a shared oracle.</li>
+      <li><b>Proceed under a labeled PROVISIONAL default</b> (the safer reading) recorded in a durable assumptions register — do not block, do not silently commit.</li>
+      <li><b>Confirm against an independent authority</b> before promoting it to settled. Never conform the oracle to the design's own output — resolve <i>upward</i> to the spec.</li>
+    </ul></div>
+    ${ai('An LLM accelerates spec comprehension and ambiguity detection but cannot manufacture <b>authority</b>. A guessed spec value anchoring a shared oracle is a hallucinated premise in a load-bearing position — the analog of one wrong retrieved fact a whole RAG chain trusts, or one mislabeled reward a whole training run optimizes toward: the error is not local, it silently corrupts everything downstream while every metric stays green. Fix: propose candidate resolutions with citations for a human to ratify, tag dependent work PROVISIONAL, resolve upward to authority.')}
+  </div></div>
+  ${foot('26 · LLM: guessed-premise blast radius')}
+</div>`);
+
+/* ---- 24. RCA case-study (generic) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 8 · worked example</div>
+  <h2 class="title">A realistic RCA, <span class="hl">step by step</span></h2>
+  <div class="sub">A generic notification-count failure — the kind of multi-layer bug that teaches why discipline matters. <b>The trace, in words:</b> the test ends with leftover completion-notifications and a stalled checker (symptom). The first plausible theory — "the design splits packets, so counts drift" — was <i>backwards</i>. Decoding the actual counts showed the design emitted the right number (10); the <i>reference model</i> was over-producing. Root cause: a golden-model defect, not a design bug — so the fix was to the model + checker, and the design was correct all along. (Fully generic; illustrative.)</div>
+  <div class="body"><div class="col card">
+    <div class="dg"><svg viewBox="0 0 1080 330" preserveAspectRatio="xMidYMid meet">${DEFS}
+      ${[
+        ['Symptom','end-of-test: leftover\\nnotifications, checker stalled','#ffcc66',60],
+        ['First theory','"design splits packets" —\\nWRONG, was inverted','#ff6b6b',290],
+        ['Evidence','decode counts: model 10 vs\\nreference over-produces','#7aa2ff',520],
+        ['Root cause','reference MODEL over-counts,\\nnot the design','#2bd4c4',750],
+        ['Resolution','fix model + checker; file\\nmodel defect; design is correct','#39d98a',980]
+      ].map(([t,d,c,x])=>{const l=d.split('\\n');return `<rect x="${x-95}" y="120" width="190" height="90" rx="10" fill="#101c36" stroke="${c}"/><text x="${x}" y="145" text-anchor="middle" font-weight="700" class="lbl" fill="${c}">${t}</text>${l.map((s,i)=>`<text x="${x}" y="${168+i*16}" text-anchor="middle" class="lbls">${s}</text>`).join('')}`;}).join('')}
+      ${[155,385,615,845].map(x=>`<path d="M${x} 165 L${x+40} 165" class="flow"/>`).join('')}
+    </svg></div>
+    <div class="two" style="margin-top:8px">
+      <div class="card"><h3>The lessons</h3><ul class="clean">
+        <li>The first plausible theory was <b>backwards</b> — only decoding the actual data (credit assignment over the coupled system) settled it.</li>
+        <li>The "expected" reference was itself the bug — a golden-model defect, not a design bug. This is precisely why you <b>never trust the verifier blindly</b>: the oracle is fallible.</li>
+        <li>Correct classification <b>prevented a false bug report</b> against a correct design.</li>
+      </ul></div>
+      ${ai('This is the shape of reasoning worth training, and the <b>retracted dead-end is the point</b>: a trace that <i>includes</i> the wrong theory and why it was refuted is higher-signal than the clean final answer — the best training data for verification reasoning. Adversarial self-critique reduces (does not eliminate) confident-wrong RCA; the byte-level evidence, not the model self-critique, is the arbiter.')}
+    </div>
+  </div></div>
+  ${foot('27 · RCA case study')}
+</div>`);
+
+/* ---- 25. PHASE 9 COVERAGE CLOSURE LOOP ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 9</div>
+  <h2 class="title">Coverage closure — the <span class="hl">driving loop</span></h2>
+  <div class="sub">Coverage-Driven Verification (CDV): the coverage report <i>directs</i> what to do next. Empty bins point to missing stimulus; the loop tightens until the plan hits 100%.</div>
+  <div class="body"><div class="col card">
+    <div class="dg"><svg viewBox="0 0 620 360" preserveAspectRatio="xMidYMid meet">${DEFS}
+      <circle cx="310" cy="185" r="130" fill="none" stroke="#2b3a5e" stroke-dasharray="4 6"/>
+      ${[
+        ['Run regression',310,55],
+        ['Merge coverage',505,185],
+        ['Find empty bins',310,315],
+        ['New constraints/seeds',115,185]
+      ].map(([t,x,y])=>`<rect x="${x-95}" y="${y-24}" width="190" height="48" rx="10" fill="#101c36" stroke="#2bd4c4"/><text x="${x}" y="${y+5}" text-anchor="middle" class="lbl">${t}</text>`).join('')}
+      <path d="M400 75 A130 130 0 0 1 490 150" class="flow2"/>
+      <path d="M505 235 A130 130 0 0 1 400 300" class="flow2"/>
+      <path d="M215 300 A130 130 0 0 1 120 235" class="flow2"/>
+      <path d="M115 150 A130 130 0 0 1 215 75" class="flow2"/>
+      <text x="310" y="180" text-anchor="middle" fill="#ff9900" font-weight="800" font-size="15">CDV loop</text>
+      <text x="310" y="200" text-anchor="middle" class="lbls">repeat until 100%</text>
+    </svg></div>
+  </div>
+  <div class="col" style="flex:0 0 360px">
+    <div class="card"><h3>Reading a coverage report</h3>
+    <ul class="clean">
+      <li><b>An empty bin is a question:</b> un-hit because stimulus cannot reach it, or because it is impossible?</li>
+      <li><b>Reachable + empty</b> → constraint gap → new stimulus.</li>
+      <li><b>Impossible</b> → exclude it, with justification (or your 100% target is unreachable forever).</li>
+    </ul></div>
+    ${ai('A strong AI fit — feed the coverage report + constraints to a model and have it generate the <b>specific stimulus that fills the named gaps</b>, then verify the bin closed. But be honest: this is a <b>sparse-reward, expensive-oracle</b> problem (each bin-close query = one full sim), so sample-efficiency and credit assignment are the real research risk — not a solved "directed search".')}
+  </div></div>
+  ${foot('28 · Coverage closure')}
+</div>`);
+
+/* ---- 26. PHASE 10 SIGNOFF ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Phase 10</div>
+  <h2 class="title">Signoff — <span class="hl">the exit criteria</span></h2>
+  <div class="sub">Verification "done" is a defined bar, agreed with the design owner and walked through before tape-out. It is evidence-based, not a feeling.</div>
+  <div class="body">
+    <div class="col">
+      <div class="two">
+        <div class="card"><h3>✔ Functional coverage at target</h3><p class="small">100% of the plan's reachable coverpoints/crosses, with every exclusion justified in writing.</p></div>
+        <div class="card"><h3>✔ Clean regression</h3><p class="small">The full suite passes across the seed set; any known-failing item is <b>tracked to a ticket</b>, not silently waived.</p></div>
+        <div class="card"><h3>✔ Assertions active &amp; non-vacuous</h3><p class="small">Protocol checks fired on real traffic; no check disabled without a documented reason.</p></div>
+        <div class="card"><h3>✔ Testplan reviewed</h3><p class="small">Every feature row closed with its <i>measured</i> status; walked through with the RTL owner.</p></div>
+      </div>
+      <div class="card" style="margin-top:12px"><h3>The honesty clause</h3>
+      <p class="small">Signoff records reality: if a test fails, it is stated with the evidence; if a scenario is out-of-scope, it is named; a "known-red, ticketed" item is acceptable — a <b>hidden</b> red is not. Confidence is only worth what it is honestly measured against.</p></div>
+      ${ai('A model can continuously audit signoff readiness: cross-check testplan status against the latest regression + coverage database, and flag any row whose claimed status disagrees with the evidence — catching drift between the plan and reality.')}
+    </div>
+  </div>
+  ${foot('29 · Signoff')}
+</div>`);
+
+/* ---- 27. METRICS ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Keeping score</div>
+  <h2 class="title">The metrics that <span class="hl">actually matter</span></h2>
+  <div class="body"><div class="col">
+    <div class="three">
+      <div class="metric"><div class="big">100%</div><div class="cap">functional coverage (reachable) — the primary signoff bar</div></div>
+      <div class="metric"><div class="big">0</div><div class="cap">unexplained regression failures</div></div>
+      <div class="metric"><div class="big">↓</div><div class="cap">bug-discovery rate that must trend to zero before signoff</div></div>
+    </div>
+    <div class="two" style="margin-top:14px">
+      <div class="card"><h3>The bug-discovery curve</h3>
+      <div class="dg" style="height:170px"><svg viewBox="0 0 520 170" preserveAspectRatio="xMidYMid meet">
+        <line x1="50" y1="145" x2="500" y2="145" stroke="#2b3a5e"/><line x1="50" y1="18" x2="50" y2="145" stroke="#2b3a5e"/>
+        <path d="M55 60 Q160 30 240 80 T480 140" stroke="#ff9900" stroke-width="3" fill="none"/>
+        <text x="270" y="165" text-anchor="middle" class="lbls">time →</text>
+        <text x="150" y="45" class="lbls" fill="#ff9900">peak bug find</text>
+        <text x="430" y="130" class="lbls" fill="#39d98a">flattening → maturity</text>
+      </svg></div>
+      <p class="small">A curve still climbing means you are not done — no matter what coverage says.</p></div>
+      <div class="card"><h3>Watch for misleading numbers</h3>
+      <ul class="clean">
+        <li>High <b>code</b> coverage with low <b>functional</b> coverage = shallow testing.</li>
+        <li>A green regression on a <b>stale build</b> <span class="def">(re-using an old compiled binary — the change under test never ran)</span> = false comfort.</li>
+        <li>Coverage that only rises when you <i>lower the bar</i> (exclusions) = self-deception.</li>
+      </ul></div>
+    </div>
+  </div></div>
+  ${foot('30 · Metrics')}
+</div>`);
+
+/* ---- NEW: DV PROGRAM MILESTONES / DESIGN-DV LOCKSTEP ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Zooming out · the program schedule</div>
+  <h2 class="title">Where DV sits on the <span class="hl">ASIC program timeline</span></h2>
+  <div class="sub">The cycle so far is <i>what</i> DV does. Zoom out and it runs against a fixed program schedule with hard gates. Design and DV advance in <b>lockstep</b>: each design maturity milestone has a matching DV sign-off that <i>gates</i> it — you cannot freeze RTL, or tape out, until DV says the evidence supports it.</div>
+  <div class="body"><div class="col card">
+    <div class="dg"><svg viewBox="0 0 1080 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+      <line x1="40" y1="70" x2="1040" y2="70" stroke="#2b3a5e" stroke-width="2"/>
+      ${[
+        ['Bring-up','first RTL runs;\\nsmoke + basic features','#7aa2ff',120],
+        ['RTL-freeze\\nsign-off','feature-complete;\\nno new function after','#2bd4c4',360],
+        ['Tape-out\\nsign-off','100% coverage,\\nclean regression','#ff9900',600],
+        ['Post-silicon','bring-up in the lab;\\nfirst real chips','#39d98a',840]
+      ].map(([t,d,c,x])=>{const l=t.split('\\n'); const dd=d.split('\\n');
+        return `<circle cx="${x}" cy="70" r="9" fill="${c}"/>
+        ${l.map((s,li)=>`<text x="${x}" y="${40+li*16}" text-anchor="middle" class="lbl" fill="${c}" font-weight="700" font-size="13">${s}</text>`).join('')}`;}).join('')}
+      <!-- DESIGN track -->
+      <text x="40" y="150" class="lbl" fill="#ff9900" font-weight="700">DESIGN</text>
+      ${[['RTL coding',120],['feature-complete RTL',360],['timing/power clean, GDS',600],['silicon debug + ECOs',840]].map(([t,x])=>`<rect x="${x-90}" y="165" width="180" height="44" rx="8" fill="#1d2a49" stroke="#ff9900"/><text x="${x}" y="192" text-anchor="middle" class="lbls">${t}</text>`).join('')}
+      <!-- DV track -->
+      <text x="40" y="245" class="lbl" fill="#2bd4c4" font-weight="700">DV (gates each)</text>
+      ${[['env + smoke up',120],['coverage model built,\\nclimbing',360],['closure + all checks\\nnon-vacuous',600],['reproduce lab issues\\nin sim; add tests',840]].map(([t,x])=>{const l=t.split('\\n');return `<rect x="${x-90}" y="260" width="180" height="52" rx="8" fill="#101c36" stroke="#2bd4c4"/>${l.map((s,li)=>`<text x="${x}" y="${281+li*15}" text-anchor="middle" class="lbls">${s}</text>`).join('')}`;}).join('')}
+      ${[120,360,600,840].map(x=>`<path d="M${x} 209 L${x} 258" class="flow2"/><path d="M${x} 79 L${x} 163" stroke="#2b3a5e" stroke-width="1" stroke-dasharray="3 3"/>`).join('')}
+      <text x="540" y="333" text-anchor="middle" class="lbls">a DV sign-off gates every design milestone — they move together, or the program slips</text>
+    </svg></div>
+  </div>
+  <div class="col" style="flex:0 0 340px">
+    <div class="card"><h3>The gates, in plain terms</h3>
+    <ul class="clean">
+      <li><b>Bring-up</b> — first RTL exists; DV stands up the env and passes smoke. Design and DV both "hello world."</li>
+      <li><b>RTL-freeze sign-off</b> — design is feature-complete; <i>no new function lands after this</i>. DV must have the coverage model built and climbing, or freeze is unsafe.</li>
+      <li><b>Tape-out sign-off</b> — the irreversible commit to fabrication. DV exit bar (100% reachable coverage, clean regression, non-vacuous checks) is a <b>hard gate</b>: if DV is red, the chip does not tape out.</li>
+      <li><b>Post-silicon</b> — real chips in the lab; DV reproduces any escape <i>in simulation</i>, adds the missing test, and feeds engineering change orders (ECOs — targeted fixes) for the next spin.</li>
+    </ul></div>
+    <div class="note">Why lockstep matters: DV that lags design means the freeze/tape-out gate is met on schedule but on <i>hope</i>, not evidence. DV that leads (coverage model ready when RTL lands) is what keeps the two tracks — and the whole program — on time.</div>
+  </div></div>
+  ${foot('31 · Program milestones')}
+</div>`);
+
+/* ---- 28. TIME PER PHASE ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Where the effort goes</div>
+  <h2 class="title">Time spent per phase <span class="hl">— and where to measure</span></h2>
+  <div class="sub">Verification is ~60-70% of a chip project's total effort. Within that, effort is <b>not</b> evenly spread: building the environment and — above all — <b>debugging</b> dominate. The shape holds for any block (DMA, compute, memory, I/O) and for full-<b>SoC</b> <span class="def">(system-on-chip)</span> integration. <i>(Ranges below are illustrative industry-typical; the shape is what matters — actuals must be measured per program.)</i></div>
+  <div class="body">
+    <div class="col card">
+      <h3>Share of verification effort (illustrative, one block)</h3>
+      <div class="dg"><svg viewBox="0 0 560 320" preserveAspectRatio="xMidYMid meet">
+        ${[
+          ['Spec & planning','~10%',10,'#7aa2ff'],
+          ['TB / env build','~25%',25,'#2bd4c4'],
+          ['Stimulus dev','~8%',8,'#2bd4c4'],
+          ['Regression / infra','~10%',10,'#7aa2ff'],
+          ['Debug & RCA','~30%',30,'#ff9900'],
+          ['Coverage closure','~12%',12,'#2bd4c4'],
+          ['Signoff','~5%',5,'#39d98a']
+        ].map(([t,p,v,c],idx)=>{
+          const y=20+idx*42; const w=v*13;
+          return `<text x="10" y="${y+18}" class="lbl" font-size="13">${t}</text>
+          <rect x="185" y="${y}" width="${w}" height="26" rx="5" fill="${c}"/>
+          <rect x="${185+w}" y="${y}" width="${13*30-w}" height="26" rx="5" fill="#16203a" stroke="#2b3a5e" opacity=".5"/>
+          <text x="${185+w+8}" y="${y+18}" class="lbl" font-size="13" font-weight="700" fill="${c}">${p}</text>`;
+        }).join('')}
+      </svg></div>
+      <div class="note">Two line items — <b>env build (~25%)</b> and <b>debug/RCA (~30%)</b> — consume over half. That is where optimization pays off most.</div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Why debug dominates</h3>
+      <ul class="clean">
+        <li>Every failing seed must be <b>classified</b> (design bug? TB bug? spec gap? flake?) — slow, expensive human reasoning.</li>
+        <li>Failures are often <b>intermittent</b> (1 seed in 50) and <b>multi-layer</b> — the visible symptom is far from the cause.</li>
+        <li>A wrong classification wastes days and files false bugs — so teams (rightly) go slow and careful.</li>
+      </ul></div>
+      <div class="card" style="margin-top:10px"><h3>Scaling to the whole chip</h3>
+      <ul class="clean">
+        <li>Env/TB build is a <b>one-time</b> cost that amortizes; debug recurs on <i>every</i> change forever.</li>
+        <li>At SoC level the absolute time grows and weight shifts toward <b>integration + system-scenario debug</b>, but debug still dominates.</li>
+      </ul></div>
+      ${ai('Do not promise a headline % cut. State a <b>hypothesis + measurement plan</b>: the automatable part of debug is <i>triage/classification</i>; the deep causal reasoning is harder and improves slowly. Measure human-minutes per failing seed against a baseline and report the delta — the objective grader (bug reproduced? bin closed?) makes that provable, not just plausible.')}
+    </div>
+  </div>
+  ${foot('32 · Time per phase')}
+</div>`);
+
+/* ---- 29. OPTIMIZATION LEVERS ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Where to optimize</div>
+  <h2 class="title">The optimization levers <span class="hl">(block → SoC)</span></h2>
+  <div class="sub">Ranked by payoff = (share of time) × (how automatable), then discounted by <b>adoptability &amp; risk</b>. This is the roadmap for where model-assist moves the needle — and it generalizes across every block and up to the full chip.</div>
+  <div class="body"><div class="col card">
+    <table class="matrix">
+      <tr><th>Time sink</th><th>Share</th><th>The lever</th><th>Payoff × risk</th></tr>
+      <tr><td><b>Debug &amp; RCA</b></td><td>~30%</td><td>Auto-cluster by signature; draft classified root-cause with evidence; known-issue matching</td><td style="color:var(--warn)"><b>Biggest prize, highest risk</b> — wrong = false bugs; needs scarce RCA traces</td></tr>
+      <tr><td><b>TB / env build</b></td><td>~25%</td><td>Scaffold agents, sequences, checkers, coverage from the protocol spec</td><td style="color:var(--good)"><b>High, low risk</b> — abundant self-labeling data</td></tr>
+      <tr><td><b>Coverage closure</b></td><td>~12%</td><td>Coverage-directed stimulus aimed at named empty bins</td><td style="color:var(--good)"><b>High</b> — objective grader, safe if wrong</td></tr>
+      <tr><td><b>Spec → plan</b></td><td>~10%</td><td>Multimodal spec reading → draft feature list &amp; testplan rows</td><td style="color:var(--warn)"><b>Medium</b> — front-loaded, accuracy-critical</td></tr>
+      <tr><td><b>Regression triage</b></td><td>~10%</td><td>Auto-retrigger, dedup, first-pass summarization</td><td style="color:var(--good)"><b>Medium, low risk</b> — mostly infra glue</td></tr>
+    </table>
+    <div class="note"><b>Payoff-ranking ≠ first-move.</b> Debug is the biggest <i>prize</i> but not the best <i>first step</i>: start where data is plentiful and being-wrong is cheap (triage, scaffolding, coverage closure), build the RCA corpus in parallel, attack debug-RCA last.</div>
+  </div>
+  <div class="col" style="flex:0 0 330px">
+    <div class="card"><h3>What "optimize" means here</h3>
+    <ul class="clean">
+      <li><b>Faster</b> — cut human hours per failing seed / per new block.</li>
+      <li><b>Earlier</b> — find bugs further left (cheaper) on the cost curve.</li>
+      <li><b>More thorough</b> — close corners a human would miss.</li>
+    </ul></div>
+    ${ai('Each lever has an <b>objective grader</b> (bug reproduced? bin closed? test green?), so you can prove the model saved time — but the highest-payoff lever (debug) is also the highest blast-radius-if-wrong AND depends on the scarcest data (RCA traces). Discount payoff by data-availability and risk; sequence accordingly.')}
+  </div></div>
+  ${foot('33 · Optimization levers')}
+</div>`);
+
+/* ---- 30. WHERE A MODEL HELPS FIRST (NEW) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Breadth · 3 of 3</div>
+  <h2 class="title">Where a model helps first — <span class="hl">invest by reward-cleanliness</span></h2>
+  <div class="sub">Building on the spectrum (slide 13): each TB type is a different RL/eval world. This slide turns that into an <b>investment ordering</b> — pick the cleanest grader to train and prove value first. <span class="def">(Slide 33 orders the <i>work-type</i>; this orders the <i>scope</i>; slide 35 maps the <i>phases</i>.)</span></div>
+  <div class="body"><div class="col card">
+    <div class="note" style="margin-top:0;margin-bottom:8px"><b>How to read the grid:</b> ■ heavy = where that testbench type spends most of its effort; · = light. Read each row across to see how the same phase re-weights by scope; the last row is the punchline.</div>
+    <table class="matrix">
+      <tr><th>Phase (dominant weight)</th><th style="text-align:center">BLOCK</th><th style="text-align:center">SoC / INTEGRATION</th><th style="text-align:center">PROTOCOL-IP</th></tr>
+      <tr><td>Stimulus + checking</td><td style="background:#1e6b57;text-align:center">■ heavy</td><td style="text-align:center">·</td><td style="text-align:center">·</td></tr>
+      <tr><td>Ordering / data integrity</td><td style="background:#1e6b57;text-align:center">■ heavy</td><td style="text-align:center">■</td><td style="text-align:center">·</td></tr>
+      <tr><td>Integration + system-scenario debug</td><td style="text-align:center">·</td><td style="background:#7a5a1e;text-align:center">■ heavy</td><td style="text-align:center">■</td></tr>
+      <tr><td>Standards compliance + vendor turnaround</td><td style="text-align:center">·</td><td style="text-align:center">·</td><td style="background:#4a3a7a;text-align:center">■ heavy</td></tr>
+      <tr><td><b>Reward cleanliness for a model</b></td><td style="text-align:center;color:var(--good)"><b>HIGH</b></td><td style="text-align:center;color:var(--bad)"><b>LOW</b></td><td style="text-align:center;color:var(--warn)"><b>MID</b></td></tr>
+    </table>
+    <div class="note"><b>Invest in order BLOCK → PROTOCOL-IP → SoC</b> — cleanest grader first. Do NOT start a model on SoC system-debug expecting the same signal density: you will get sparse, noisy rewards and confident-but-wrong root-causes.</div>
+  </div>
+  <div class="col" style="flex:0 0 340px">
+    <div class="card"><h3>Why the ordering</h3>
+    <ul class="clean">
+      <li><b>Block</b> — bounded protocol, independent golden = a <b>verifiable reward</b> that is <i>per-transaction dense</i> (the golden scores every transaction), though the <i>terminal</i> signal (a rare-seed bug reproduced) stays sparse. Short <b>horizons</b> <span class="def">(steps between an action and its measurable consequence)</span>. Point a model here first.</li>
+      <li><b>Protocol-IP</b> — clean but <i>externally-defined</i> reward (the VIP's verdict) with a large vendor-facing off-platform slice; good grader, smaller model-addressable surface.</li>
+      <li><b>SoC</b> — sparse reward, long horizon, weak/absent single oracle, partial observability; lean on process reward / adversarial self-critique, later.</li>
+    </ul></div>
+    ${ai('Even the clean block oracle is silently wrong if it observes at the wrong tap point or matches by arrival order instead of identity — the grader is sharp only after that reconstruction is done right. Earn trust where the grader is sharpest, then generalize up-scope.')}
+  </div></div>
+  ${foot('34 · Where a model helps first')}
+</div>`);
+
+/* ---- 31. WHERE AI PLUGS IN (matrix) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The mission</div>
+  <h2 class="title">Where a model plugs into <span class="hl">every phase</span></h2>
+  <div class="sub">Mapping the cycle to concrete, high-value model tasks — scoped as draft / audit / propose <i>for a human to review</i>, never autonomous sign-off.</div>
+  <div class="body"><div class="col card">
+    <table class="matrix">
+      <tr><th>Phase</th><th>Model task</th><th>Why it fits</th></tr>
+      <tr><td><b>Spec → features</b></td><td>Multimodal spec reading; draft feature list; flag candidate ambiguities</td><td>structured extraction from prose+tables+diagrams</td></tr>
+      <tr><td><b>Testplan</b></td><td>Draft rows; detect unmapped features (holes)</td><td>set-difference is a near-deterministic check</td></tr>
+      <tr><td><b>TB build</b></td><td>Scaffold UVM agents/sequences/coverage from protocol</td><td>standardized boilerplate</td></tr>
+      <tr><td><b>Stimulus</b></td><td>Coverage-directed constraint/seed generation</td><td>sparse-reward search toward empty bins</td></tr>
+      <tr><td><b>Checking</b></td><td>Audit checkers vs invariants; spot vacuous/masked/golden-from-device</td><td>rule-based anti-pattern recognition</td></tr>
+      <tr><td><b>Coverage</b></td><td>Propose coverpoints/crosses; reason reachable vs impossible</td><td>combinatorial reasoning over the spec</td></tr>
+      <tr><td><b>Debug / RCA</b></td><td>Cluster failures; draft classified root-cause; separate-reviewer self-check</td><td>hypothesis→evidence→classify (gated)</td></tr>
+      <tr><td><b>Signoff</b></td><td>Reconcile testplan status vs live coverage/regression</td><td>consistency auditing at scale</td></tr>
+    </table>
+  </div></div>
+  ${foot('35 · AI across the cycle')}
+</div>`);
+
+/* ---- NEW: AI ACROSS THE PROGRAM TIMELINE (not just per-phase) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The other axis · across the schedule</div>
+  <h2 class="title">Where a model earns its keep <span class="hl">across the program</span></h2>
+  <div class="sub">The previous slide maps AI to <i>phases</i>. Just as important is <i>when</i> in the program a model moves the needle — because a chip schedule is a running fight against ambiguity, shifting priorities, and late risk. The highest-value moments are the ones that would otherwise stall a human team for days.</div>
+  <div class="body"><div class="col card">
+    <div class="dg"><svg viewBox="0 0 1080 320" preserveAspectRatio="xMidYMid meet">${DEFS}
+      <line x1="40" y1="60" x2="1040" y2="60" stroke="#2b3a5e" stroke-width="2"/>
+      <text x="40" y="40" class="lbls">early</text><text x="1010" y="40" class="lbls">late</text>
+      ${[
+        ['EARLY — architecture','#7aa2ff',180,'resolve spec ambiguity fast','read every doc + figure, cross-check','for contradictions, draft the','clarifying questions to the architect'],
+        ['MID — priority shift','#2bd4c4',520,'re-plan in hours, not weeks','when scope pivots, re-derive the','feature/testplan delta + coverage','impact of the change instantly'],
+        ['LATE — de-risking','#ff9900',860,'find the last hidden corners','target the un-hit reachable bins,','draft the negative/error tests','a tired team skips before tape-out']
+      ].map(([t,c,x,a,b,d,e])=>`
+        <circle cx="${x}" cy="60" r="9" fill="${c}"/>
+        <text x="${x}" y="90" text-anchor="middle" class="lbl" fill="${c}" font-weight="700">${t}</text>
+        <rect x="${x-150}" y="105" width="300" height="150" rx="10" fill="#101c36" stroke="${c}"/>
+        <text x="${x}" y="132" text-anchor="middle" class="lbl" fill="#fff" font-weight="700" font-size="13">${a}</text>
+        <text x="${x}" y="162" text-anchor="middle" class="lbls">${b}</text>
+        <text x="${x}" y="182" text-anchor="middle" class="lbls">${d}</text>
+        <text x="${x}" y="202" text-anchor="middle" class="lbls">${e}</text>
+      `).join('')}
+      <text x="540" y="295" text-anchor="middle" class="lbls">value is highest exactly where a human team would otherwise stall — ambiguity, re-planning, and last-mile risk</text>
+    </svg></div>
+  </div>
+  <div class="col" style="flex:0 0 350px">
+    <div class="card"><h3>Three high-leverage program moments</h3>
+    <ul class="clean">
+      <li><b>Early — before any scaffold exists.</b> The timing-specific value: this is <i>pre-RTL</i>, with no testbench and no coverage model to ground against — the highest-leverage moment. It compresses the slow human bottleneck of turning an ambiguous, contradiction-laden spec into the <i>cited</i> questions an architect must resolve, so the program starts on settled ground. (It proposes; the architect decides.)</li>
+      <li><b>Mid — priority shift.</b> Chip schedules pivot: a feature is cut, added, or re-prioritized. A model re-derives the <b>delta</b> — which features, tests, and coverage points change — in hours, so re-planning does not freeze the team. (This moment has no phase-map equivalent — it is purely a schedule event.)</li>
+      <li><b>Late — schedule-pressure triage.</b> The timing-specific value: near tape-out the binding constraint is <i>time</i>, so the scarce decision is <b>what to skip</b>. A model ranks the remaining reachable-but-empty corners by risk and drafts the negative / error-injection tests a tired team would otherwise drop — turning "we ran out of time" into a deliberate, risk-ranked call.</li>
+    </ul></div>
+    ${ai('This is the <b>temporal</b> complement to the per-phase map: the same draft/audit/propose scoping, but timed to the program bottlenecks. Each moment maps to a model strength — long-context multi-doc reading (early), impact-analysis over a structured plan (mid), coverage-directed generation toward named gaps (late) — and each keeps a human as the authority/decision-maker.')}
+  </div></div>
+  ${foot('36 · AI across the program timeline')}
+</div>`);
+
+/* ---- 32. TRAINING DATA IMPLICATIONS ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">For model training</div>
+  <h2 class="title">Why bounded-protocol DV envs are <span class="hl">ideal</span> (DMA is one)</h2>
+  <div class="sub">To make a model good at this, the training signal must be structured, checkable, and rich in the reasoning we want learned — not just code.</div>
+  <div class="body">
+    <div class="col">
+      <div class="two">
+        <div class="card"><h3>High-signal artifacts (must be built)</h3>
+        <ul class="clean">
+          <li><b>Spec ↔ feature ↔ testplan</b> triples (the mapping we want learned).</li>
+          <li><b>Stimulus + reference output + verdict</b> triples (inputs, golden, pass/fail).</li>
+          <li><b>Coverage report → the stimulus that closed the gap</b> (directed-search supervision).</li>
+          <li><b>RCA traces</b>: symptom → dead-ends → verified cause → classification.</li>
+        </ul>
+        <p class="small" style="margin-top:6px;color:#ffcc66">These are rarely stored as clean aligned data — assembling them is real data-pipeline work, plausibly larger than the modeling.</p></div>
+        <div class="card"><h3>The reward structure</h3>
+        <ul class="clean">
+          <li>The grader is a <b>deterministic simulator</b>, not a learned reward model — it sidesteps the reward-model hacking that plagues RLHF.</li>
+          <li>But <b>verifiable ≠ ground truth</b>: the oracle is fallible and gameable — disagreement triggers a provenance investigation, not a blind update.</li>
+          <li>Rewards range from <b>dense</b> (coverage delta) to <b>sparse</b> (a rare-seed bug reproduced over a long trajectory — hard-RL).</li>
+        </ul></div>
+      </div>
+      <div class="card" style="margin-top:12px"><h3>The reinforcement angle</h3>
+      <p class="small">Verification is a rare engineering domain with a built-in, automatable, <i>deterministic</i> grader — a strong fit for post-/mid-training with verifiable rewards, but <b>necessary, not sufficient</b>: the grader is table stakes; the scarce reasoning traces and the reward design are the remaining work. The reward must accept any <b>spec-legal output set</b>, not one observed trace; and grader-coverage ≠ correctness (passing the known checks proves they were not broken, not that the design is correct).</p></div>
+    </div>
+  </div>
+  ${foot('37 · Training corpus')}
+</div>`);
+
+/* ---- 33. GUARDRAILS ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Do it right</div>
+  <h2 class="title">Guardrails — closing the <span class="hl">reward-hacking arc</span></h2>
+  <div class="sub">The four false-greens from earlier are the <b>reward hacks</b> an outcome-only grader incentivizes. These guardrails are their fixes — and they are themselves <b>trainable, testable behaviors</b>: an eval suite, not just advice.</div>
+  <div class="body"><div class="col">
+    <div class="two">
+      <div class="card"><h3>Never conform golden to the DUT</h3><p class="small">If a model "fixes" a mismatch by making the reference match observed output, it has destroyed the check. Golden derives from spec — always. <i>(Closes: golden-from-device.)</i></p></div>
+      <div class="card"><h3>Never mask to go green</h3><p class="small">Silencing a check to pass a test is negative work. Classify (real bug vs TB bug) and fix the cause, not the symptom. <i>(Closes: masked check + coverage theater.)</i></p></div>
+      <div class="card"><h3>Prove before blaming</h3><p class="small">Filing a design bug that is actually a testbench bug costs a designer real time. Provenance and evidence must precede any blame. <i>(Closes: easy-blame.)</i></p></div>
+      <div class="card"><h3>Verify, then claim</h3><p class="small">"It should work" ≠ "it works." A generated fix/test is unproven until the sim confirms the observable effect. <i>(Closes: vacuous check.)</i></p></div>
+    </div>
+    ${ai('Frame the guardrails as an <b>eval suite with process rewards</b>: reward "correctly refused to mask", reward "retracted a wrong theory when the bytes disagreed", reward "proved provenance before blaming". One subtlety: reward <b>correct classification</b>, not caution — an assistant that refuses everything is as useless as one that masks everything. This is what separates a useful DV assistant from a dangerous one.')}
+  </div></div>
+  ${foot('38 · Guardrails')}
+</div>`);
+
+/* ---- 34. CLOSING ---- */
+slides.push(`
+<div class="slide cover">
+  <div class="kicker">Takeaways</div>
+  <h2 class="title" style="font-size:42px">The cycle in <span class="hl">one breath</span></h2>
+  <div class="quote" style="margin-top:20px">
+    Turn the <span class="hl">spec</span> into a plan → build a black-box <span class="hl">testbench</span> → drive <span class="hl">constrained-random</span> traffic → check against a <span class="hl">golden model</span> at the right tap point → <span class="hl">measure coverage</span> → <span class="hl">regress</span> at scale → <span class="hl">root-cause</span> honestly → close the loop until <span class="hl">100%</span> → sign off on evidence — at <span class="hl">every scope</span>, from one block to the full chip.
+  </div>
+  <div class="badgerow" style="margin-top:30px">
+    <div class="badge"><b>Golden = spec</b>, never observed output</div>
+    <div class="badge"><b>Judge at the boundary</b>, on completion</div>
+    <div class="badge"><b>Coverage</b> decides "done", not vibes</div>
+    <div class="badge"><b>Classify before blaming</b></div>
+    <div class="badge"><b>A pass is not proof</b></div>
+    <div class="badge"><b>Ownership crosses team lines</b></div>
+  </div>
+  <div class="sub" style="margin-top:28px">Many phases — especially coverage closure, checking, and regression — have an objective, deterministic grader. That is exactly why verification is fertile ground for models that learn to help design better chips — provided the reward is designed so that changing <i>what</i> is checked is never the cheapest path to green.</div>
+  ${foot('39 · Close')}
+</div>`);
+
+/* ============================ ENGINE ============================ */
+const deck = document.getElementById('deck');
+deck.innerHTML = slides.join('');
+const S = [...document.querySelectorAll('.slide')];
+let i = 0;
+function show(n){
+  i = Math.max(0, Math.min(S.length-1, n));
+  S.forEach((s,k)=>s.classList.toggle('active', k===i));
+  document.getElementById('prog').style.width = ((i)/(S.length-1)*100)+'%';
+  document.getElementById('num').textContent = (i+1)+' / '+S.length;
+  location.hash = i+1;
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' ') {show(i+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'||e.key==='PageUp'){show(i-1);e.preventDefault();}
+  else if(e.key==='Home'){show(0);}
+  else if(e.key==='End'){show(S.length-1);}
+  else if(e.key.toLowerCase()==='f'){if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen();}
+  else if(e.key.toLowerCase()==='p'){window.print();}
+  else if(e.key.toLowerCase()==='o'){document.body.classList.toggle('ov');}
+});
+deck.addEventListener('click',e=>{ if(e.clientX > window.innerWidth*0.62) show(i+1); else if(e.clientX < window.innerWidth*0.18) show(i-1); });
+const start = parseInt(location.hash.replace('#',''))||1; show(start-1);
+</script>
+</body>
+</html>
