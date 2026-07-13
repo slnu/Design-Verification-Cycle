@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Tools That Teach — Building AI That Sharpens Its User Instead of Eroding It (Part IV)</title>
+<style>
+  :root{
+    --bg:#0c1222; --bg2:#111a30; --panel:#16203a; --panel2:#1d2a49;
+    --ink:#e9eef7; --muted:#9fb0cc; --line:#2b3a5e;
+    --accent:#ff9900;     /* primary accent */
+    --accent2:#2bd4c4;    /* teal */
+    --accent3:#7aa2ff;    /* blue */
+    --good:#39d98a; --warn:#ffcc66; --bad:#ff6b6b;
+    --dut:#ff9900; --tb:#2bd4c4; --ref:#7aa2ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, #17233f 0%, var(--bg) 55%);
+    color:var(--ink); font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+  #deck{height:100vh;width:100vw;position:relative}
+  .slide{
+    position:absolute;inset:0;display:none;flex-direction:column;
+    padding:44px 64px 70px;opacity:0;transition:opacity .25s ease;
+  }
+  .slide.active{display:flex;opacity:1}
+  h1,h2,h3{margin:0;line-height:1.12}
+  .kicker{color:var(--accent);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:13px;margin-bottom:10px}
+  h2.title{font-size:35px;font-weight:800;letter-spacing:-.5px}
+  h2.title .hl{color:var(--accent)}
+  .sub{color:var(--muted);font-size:15.5px;margin-top:9px;max-width:1090px;line-height:1.5}
+  .sub b{color:#cfe}
+  .body{flex:1;display:flex;gap:26px;margin-top:16px;min-height:0}
+  .col{flex:1;min-width:0}
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:14px;padding:15px 17px}
+  .card h3{font-size:15px;color:var(--accent2);margin-bottom:7px;letter-spacing:.02em}
+  ul.clean{margin:5px 0 0;padding-left:18px}
+  ul.clean li{margin:6px 0;color:#cfdaee;font-size:14px;line-height:1.46}
+  ul.clean li b{color:#fff}
+  .ai{background:linear-gradient(180deg,#241a08,#1a1405);border:1px solid #6b4c12;border-radius:12px;padding:12px 15px;margin-top:12px}
+  .ai .tag{color:var(--accent);font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  .ai p{margin:6px 0 0;color:#f0dcb8;font-size:13.5px;line-height:1.46}
+  .ai .bulb{width:16px;height:16px;display:inline-block}
+  .footer{position:absolute;left:64px;right:64px;bottom:24px;display:flex;justify-content:space-between;align-items:center;color:#63769a;font-size:12.5px;border-top:1px solid var(--line);padding-top:12px}
+  .footer .brand{font-weight:700;color:#8fa3c6;letter-spacing:.04em}
+  .progress{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);transition:width .25s}
+  .num{position:absolute;right:20px;bottom:22px;color:#5b6d90;font-size:12px}
+  .hint{position:absolute;left:20px;bottom:22px;color:#3d4c6b;font-size:11px}
+  svg{width:100%;height:100%;display:block}
+  .dg{width:100%;height:100%;min-height:0}
+  text{font-family:"Segoe UI",Roboto,Arial,sans-serif}
+  .lbl{fill:var(--ink);font-size:13px}
+  .lbls{fill:var(--muted);font-size:11px}
+  .box{fill:var(--panel2);stroke:var(--line);stroke-width:1.4}
+  .flow{stroke:var(--muted);stroke-width:2;fill:none;marker-end:url(#arr)}
+  .flow2{stroke:var(--accent2);stroke-width:2;fill:none;marker-end:url(#arrT)}
+  .flowO{stroke:var(--accent);stroke-width:2.4;fill:none;marker-end:url(#arrO)}
+  .flowR{stroke:var(--bad);stroke-width:2;fill:none;marker-end:url(#arrR)}
+  .kbig{fill:#fff;font-weight:700;font-size:15px}
+  .cover{align-items:flex-start;justify-content:center}
+  .cover .chip{width:104px;height:104px;margin-bottom:20px}
+  .cover h1{font-size:52px;font-weight:800;letter-spacing:-1px;max-width:1120px}
+  .cover h1 .hl{color:var(--accent)}
+  .cover .tagline{color:var(--muted);font-size:19px;margin-top:16px;max-width:960px;line-height:1.5}
+  .badgerow{margin-top:22px;display:flex;gap:12px;flex-wrap:wrap}
+  .badge{background:#16203a;border:1px solid var(--line);border-radius:10px;padding:9px 15px;font-size:13.5px;color:#cfe;}
+  .badge b{color:var(--accent)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+  .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px}
+  .note{color:var(--muted);font-size:12.6px;font-style:italic;margin-top:8px}
+  .note b{color:#cfe;font-style:normal}
+  .quote{font-size:24px;font-weight:600;line-height:1.4;max-width:1050px;color:#fff}
+  .quote .hl{color:var(--accent)}
+  .small{font-size:13.2px;color:#cfdaee;line-height:1.46}
+  .small b{color:#fff}
+  .ex{background:#0f1b31;border:1px dashed #3a4d78;border-radius:10px;padding:9px 13px;margin-top:9px;font-size:13px;color:#cfdaee;line-height:1.45}
+  .ex .xt{color:var(--accent3);font-weight:800;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;margin-right:8px}
+  .ex b{color:#fff}
+  table.matrix{width:100%;border-collapse:collapse;font-size:12.8px}
+  table.matrix th,table.matrix td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.matrix th{background:#1b2743;color:var(--accent2);font-weight:700}
+  table.matrix td b{color:#fff}
+  table.matrix tr:nth-child(even) td{background:#111a30}
+  .disc{position:fixed;top:10px;right:16px;font-size:10.5px;color:#3d4c6b}
+  .contact{color:var(--muted);font-size:14px;margin-top:18px}
+  .contact b{color:#cfe}
+  .xlink{margin-top:10px;font-size:13.5px}
+  .xlink a{color:var(--accent2);text-decoration:none;border-bottom:1px dotted var(--accent2)}
+  .toc{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  .agrow{display:flex;align-items:center;gap:16px;background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:12px;padding:9px 18px;cursor:pointer;transition:border-color .15s ease,transform .15s ease}
+  .agrow:hover{border-color:var(--accent);transform:translateX(5px)}
+  .agrow .n{flex:0 0 32px;height:32px;border-radius:9px;background:#1b2743;color:var(--accent);font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+  .agrow .t{font-size:14.5px;color:#fff;font-weight:700}
+  .agrow .d{font-size:12.2px;color:var(--muted);margin-top:1px}
+  .agrow .pg{margin-left:auto;color:#63769a;font-size:12px;white-space:nowrap;padding-left:14px}
+  .def{color:#9fb0cc;font-weight:400}
+  .eduband{background:#0f2320;border:1px solid var(--accent2);border-radius:12px;padding:12px 16px;margin-top:20px;max-width:1000px;color:#bfeee7;font-size:14px;line-height:1.5}
+  .eduband b{color:var(--accent2)}
+  .edutag{position:fixed;top:10px;left:16px;font-size:10.5px;color:#0c1222;background:var(--accent2);border-radius:5px;padding:2px 9px;font-weight:800;letter-spacing:.06em;z-index:5}
+  .plain{margin-top:8px;font-size:14.5px;line-height:1.4;color:#dfe9ff;background:#122038;border-left:3px solid var(--accent2);border-radius:0 8px 8px 0;padding:7px 13px;max-width:1080px}
+  .plain b{color:var(--accent2);font-weight:700}
+  .plain .lvl{color:var(--accent2);font-weight:800;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-right:8px}
+  .risk{background:linear-gradient(180deg,#2a1214,#1a0c0d);border:1px solid #6b2c2c;border-radius:12px;padding:11px 15px;margin-top:12px}
+  .risk .tag{color:#ff9a9a;font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+  .risk p{margin:5px 0 0;color:#f0cccc;font-size:13.3px;line-height:1.46}
+  .risk b{color:#fff}
+  .ptag{display:inline-block;background:#141c33;border:1px solid var(--accent3);color:#a9c2ff;border-radius:20px;padding:2px 11px;font-size:11px;font-weight:700;margin:3px 5px 0 0}
+  .lever{display:inline-block;background:#1b2743;color:var(--accent);border-radius:6px;padding:2px 10px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+  .epi{border-left:3px solid var(--accent);padding:6px 0 6px 18px;margin:18px 0 0;max-width:1000px}
+  .epi p{margin:0;color:#e9eef7;font-size:16px;font-style:italic;line-height:1.5}
+  .epi .att{color:var(--muted);font-size:12.8px;font-style:normal;margin-top:7px;display:block}
+  .cite{margin-top:8px;font-size:11.5px;color:#5b6d90;font-style:normal}
+  .cite b{color:#8fa3c6;font-style:normal}
+  @media print{
+    body{overflow:visible;background:#0c1222 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #deck{height:auto}
+    .slide{display:flex !important;opacity:1 !important;position:relative;height:100vh;page-break-after:always;inset:auto}
+    .progress,.num,.hint{display:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="disc">Educational • Generic industry example • No proprietary/program-specific content</div>
+<div class="edutag">EDUCATION ONLY</div>
+<div id="deck"></div>
+<div class="progress" id="prog"></div>
+<div class="num" id="num"></div>
+<div class="hint">← → navigate · F fullscreen · O overview · P print/PDF</div>
+
+<script>
+/* ============================ SLIDE CONTENT ============================ */
+/* risk() and foot() take DOUBLE-quoted args so apostrophes inside are harmless; interior quotes use curly “ ” */
+function risk(txt){return `<div class="risk"><div class="tag">⚠ The failure mode to design against</div><p>${txt}</p></div>`;}
+function foot(t){return `<div class="footer"><span class="brand">Design Verification — Foundations · Part IV</span><span>${t}</span></div>`;}
+function ptag(t){return `<span class="ptag">Targets: ${t}</span>`;}
+
+const DEFS = `<defs>
+  <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9fb0cc"/></marker>
+  <marker id="arrT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2bd4c4"/></marker>
+  <marker id="arrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff9900"/></marker>
+  <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff6b6b"/></marker>
+</defs>`;
+
+const slides = [];
+
+/* ---- 1. COVER ---- */
+slides.push(`
+<div class="slide cover">
+  <svg class="chip" viewBox="0 0 120 120">
+    <rect x="26" y="26" width="68" height="68" rx="8" fill="#16203a" stroke="#ff9900" stroke-width="2.5"/>
+    <rect x="42" y="42" width="36" height="36" rx="4" fill="#1d2a49" stroke="#7aa2ff" stroke-width="2"/>
+    <text x="60" y="64" fill="#7aa2ff" font-size="12" text-anchor="middle" font-weight="700">DUT</text>
+    ${[...Array(5)].map((_,i)=>`<line x1="${34+i*13}" y1="26" x2="${34+i*13}" y2="12" stroke="#7aa2ff" stroke-width="2"/><line x1="${34+i*13}" y1="94" x2="${34+i*13}" y2="108" stroke="#7aa2ff" stroke-width="2"/><line x1="26" y1="${34+i*13}" x2="12" y2="${34+i*13}" stroke="#7aa2ff" stroke-width="2"/><line x1="94" y1="${34+i*13}" x2="108" y2="${34+i*13}" stroke="#7aa2ff" stroke-width="2"/>`).join('')}
+    <circle cx="60" cy="60" r="52" fill="none" stroke="#7aa2ff" stroke-width="2" stroke-dasharray="4 5" opacity="0.7"/>
+  </svg>
+  <div class="kicker">A foundations primer · Part IV</div>
+  <h1>Tools That <span class="hl">Teach</span></h1>
+  <div class="tagline">Building AI that leaves its user <b style="color:var(--accent2)">more capable</b>, not less — the tool-builder's answer to Part III. If the assistant optimizes only for finishing the task, it manufactures the very skill-atrophy Part III diagnosed. Here is how to design against that.</div>
+  <div class="epi">
+    <p>"I never guess. It is a shocking habit — destructive to the logical faculty."</p>
+    <span class="att">— Sir Arthur Conan Doyle, Sherlock Holmes · the whole deck is about tools that <i>refuse to silently guess</i> — that surface the doubt instead of hiding it.</span>
+  </div>
+  <div class="eduband"><b>For builders.</b> This is for the people who design the model, the assistant, and its reward — model researchers, agent/tool builders, and reward engineers. It teaches design <i>directions and their tradeoffs</i>, uses only public, industry-standard ideas, names no product, and marks research-grade ideas as such. Several are open problems, not shipped features.</div>
+  <div class="badgerow">
+    <div class="badge"><b>Audience:</b> model researchers · assistant &amp; agent builders · reward/eval engineers</div>
+    <div class="badge"><b>Question:</b> can the tool foster the judgment it currently erodes?</div>
+    <div class="badge"><b>Stance:</b> mechanisms + honest tradeoffs, not a product pitch</div>
+  </div>
+  <div class="contact"><b>Shrikant Sundaram</b></div>
+  <div class="xlink"><a href="https://slnu.github.io/Design-Verification-Cycle/#1">← Part I: The DV Cycle</a> · <a href="part2.html">← Part II: The Limits of Translation</a> · <a href="part3.html">← Part III: Learning to Verify</a></div>
+  ${foot('01 · Title')}
+</div>`);
+
+/* ---- 2. CONTENTS ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">What we'll cover</div>
+  <h2 class="title">Contents <span class="hl">— click any section to jump</span></h2>
+  <div class="sub">The series, in one line each: <b>I</b> — the DV cycle. <b>II</b> — why verification persists when AI writes the RTL. <b>III</b> — how a human earns the judgment to catch the model. <b>IV</b> — how the <i>builder</i> shapes the tool so it grows that judgment instead of eroding it. This deck expands Part III's one bullet, "shape the tool, not just the person," into its own set of mechanisms — grouped by the three levers a builder actually controls.</div>
+  <div class="body"><div class="col">
+    <div class="toc">
+      ${[
+        ['0','Part III in 30 seconds','Self-contained recap: the one idea + the four pitfalls, for readers who skipped Part III','3','3'],
+        ['1','The flip: an assistant that sharpens','Default assistants optimize task completion — and manufacture those pitfalls; redefine the objective','4','4'],
+        ['2','You get what you measure — three levers','Product/UX, Reward, and Eval: where a builder can move the objective','5','5'],
+        ['3','Lever 1 · Modes that scope the help','TUTOR / SPAR / DO — the earn-vs-delegate line as config, not exhortation','6','6'],
+        ['4','Lever 1 · Refuse to guess','Surface what the spec is silent on; gate high-stakes generation behind a prediction','7','7'],
+        ['5','Lever 1 · Show your work','Provenance on verdicts, not just code; nudge the over-reliant user to self-probe','8','8'],
+        ['6','Lever 2 · Reward the reasoning','Reward eliciting understanding; penalize confident-and-wrong asymmetrically','9','9'],
+        ['7','Lever 2 · Make it attack its own green','Self-adversarial pass — the fix for the gameable-artifact recursion','10','10'],
+        ['8','Lever 3 · Measure the right thing','Ambiguity-recovery and student-transfer evals','11','11'],
+        ['9','The honest tradeoffs','Every mechanism can be gamed one level up — including these','12','12'],
+        ['10','The unifying thread','Wrong-and-confident is the enemy; calibration is the spine','13','13'],
+        ['11','Close','The tool worth building is the one that makes its user need it less','14','14']
+      ].map(([n,t,d,go,pg])=>`<div class="agrow" onclick="show(${go}-1)"><div class="n">${n}</div><div><div class="t">${t}</div><div class="d">${d}</div></div><div class="pg">slide ${go}</div></div>`).join('')}
+    </div>
+    <div class="note">Every mechanism carries a <b style="color:var(--accent3)">pitfall tag</b> (which Part III failure it counters) and a <b style="color:#ff9a9a">failure-mode box</b> (how it backfires). Honesty is the point: none of these is free, and each can be gamed.</div>
+  </div></div>
+  ${foot('02 · Contents')}
+</div>`);
+
+/* ---- 3. PART III IN 30 SECONDS (self-contained recap) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">If you're here for the models, start here</div>
+  <h2 class="title">Part III in <span class="hl">30 seconds</span></h2>
+  <div class="sub">This deck is for tool-builders and doesn't assume you read Part III (which was for DV engineers). Everything below stands on these four observations about what happens when a capable model meets a human still learning the craft. Each later mechanism cites which one it counters.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card"><h3>The one idea everything rests on</h3>
+      <p class="small"><b>Understanding is not visible in the artifact.</b> A piece of work produced with real understanding and one produced by pasting a model's output can look <i>identical</i> on the page. You cannot read comprehension off the deliverable — you can only find it by probing. That single fact is why "it compiles / it passed / it looks right" never proves the person (or the model) understood anything.</p></div>
+      ${risk("This is the human version of Part II's thesis: conformance (it looks right) is not correctness (it is right, and understood). A benchmark score that doesn't generalize is the same failure — the eval passed, the capability never formed.")}
+    </div>
+    <div class="col">
+      <div class="card"><h3>The four pitfalls this deck designs against</h3>
+      <ul class="clean">
+        <li><b>Hollow deliverable</b> — output that looks complete with no understanding beneath it. <span class="def">(fast, impressive, empty when probed)</span></li>
+        <li><b>Capable-only-when-pushed ("Pattern B")</b> — the person can produce the right answer <i>when asked the exact question</i>, but never self-initiates the check — so a senior must push every task. Judgment outsourced upward; doesn't scale.</li>
+        <li><b>Accept-the-oracle-blindly ("the oracle-trap")</b> — a confident wrong verdict taken at face value, no independent check.</li>
+        <li><b>Guess-on-ambiguity</b> — silently picking a default where the spec was silent, instead of surfacing the gap.</li>
+      </ul></div>
+      <div class="note">Part III's answer for the <b>human</b>: earn judgment by hand, spar with the model instead of obeying it, predict-then-verify, and be suspicious of your own green. <b>Part IV asks the builder to make the tool support all of that</b> — that's the whole deck.</div>
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> A model can hand someone work they don't understand — and you can't tell from the output. <b>Four ways that goes wrong; the rest of this deck is how the tool can push back on each.</b></div>
+  ${foot('03 · Part III in 30 seconds')}
+</div>`);
+
+/* ---- 4. THE FLIP ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The flip</div>
+  <h2 class="title">Redefine what the assistant is <span class="hl">optimizing for</span></h2>
+  <div class="sub">A default assistant is scored on <i>finishing the task</i> — accept-rate, latency, thumbs-up. Optimize that alone and you get exactly Part III's failures: it produces the hollow deliverable, answers only when pushed, asserts confidently, and guesses on silence. The reframe: the assistant's job is not just to produce the artifact — it is to <b>leave the user more capable of producing the next one without it</b>.</div>
+  <div class="body">
+    <div class="col">
+      <svg class="dg" viewBox="0 0 520 300" preserveAspectRatio="xMidYMid meet">
+        ${DEFS}
+        <rect x="0" y="0" width="520" height="300" fill="#0c1222"/>
+        <!-- default path -->
+        <text x="150" y="30" text-anchor="middle" fill="#ff9a9a" font-size="12" font-weight="800">OPTIMIZE: finish the task</text>
+        <rect x="60" y="46" width="180" height="40" rx="9" class="box"/><text x="150" y="70" text-anchor="middle" class="lbl">accept-rate · latency · 👍</text>
+        <path d="M150 86 L150 118" class="flowR"/>
+        <rect x="40" y="120" width="220" height="52" rx="10" fill="#25121a" stroke="#ff6b6b"/>
+        <text x="150" y="141" text-anchor="middle" fill="#ff9a9a" class="lbls">user ships it, learns nothing;</text>
+        <text x="150" y="158" text-anchor="middle" fill="#ff9a9a" class="lbls">next task still needs the tool</text>
+        <text x="150" y="196" text-anchor="middle" fill="#ff9a9a" class="lbls">dependence ↑ · capability flat</text>
+        <!-- cognizant path -->
+        <text x="380" y="30" text-anchor="middle" fill="#8fe0b6" font-size="12" font-weight="800">OPTIMIZE: leave them capable</text>
+        <rect x="290" y="46" width="180" height="40" rx="9" class="box"/><text x="380" y="65" text-anchor="middle" class="lbls">did a later turn show</text><text x="380" y="80" text-anchor="middle" class="lbls">the user reasoning?</text>
+        <path d="M380 86 L380 118" class="flow2"/>
+        <rect x="270" y="120" width="220" height="52" rx="10" fill="#0f2018" stroke="#39d98a"/>
+        <text x="380" y="141" text-anchor="middle" fill="#8fe0b6" class="lbls">user finishes AND understands;</text>
+        <text x="380" y="158" text-anchor="middle" fill="#8fe0b6" class="lbls">next task needs the tool less</text>
+        <text x="380" y="196" text-anchor="middle" fill="#8fe0b6" class="lbls">capability ↑ · trust earned</text>
+      </svg>
+    </div>
+    <div class="col">
+      <div class="card"><h3>The four pitfalls this deck designs against</h3>
+      <ul class="clean">
+        <li><b>Hollow deliverable</b> — output that looks right with no understanding beneath it.</li>
+        <li><b>Capable-only-when-pushed</b> — right answer on demand, never self-initiated.</li>
+        <li><b>Accept-the-oracle-blindly</b> — a confident wrong verdict taken at face value.</li>
+        <li><b>Guess-on-ambiguity</b> — silently picking a default where the spec was silent.</li>
+      </ul>
+      <p class="small" style="margin-top:9px">All four are what Part III told the <i>human</i> to resist. Part IV asks the <b>builder</b> to make the tool resist them too — because the tool is part of the environment that shapes the human.</p></div>
+      ${risk("The reframed objective is far harder to measure than accept-rate — 'did the user get more capable?' is delayed, sparse, and easy to fake. The rest of this deck is really about finding observable proxies for it without rewarding the proxy instead of the goal (Part II's lesson, aimed back at ourselves).")}
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> A tool graded only on "did it finish the task?" will make users faster and shallower. <b>Grade it on "did it leave the user more able to do the next one alone?"</b> — and the design problems change completely.</div>
+  ${foot('04 · The flip')}
+</div>`);
+
+/* ---- 4. THREE LEVERS ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Where a builder can move</div>
+  <h2 class="title">You get what you measure — <span class="hl">so move the measure</span></h2>
+  <div class="sub">Part III slide 5 said it for humans: reward only throughput and the rational move is the shortcut. The same is true for the tool you build. There are three levers, from fastest-to-ship to hardest-but-deepest — and they reinforce each other: product shapes the moment, reward shapes the habit, eval tells you whether either worked.</div>
+  <div class="body">
+    <div class="col">
+      <svg class="dg" viewBox="0 0 520 300" preserveAspectRatio="xMidYMid meet">
+        ${DEFS}
+        <rect x="0" y="0" width="520" height="300" fill="#0c1222"/>
+        <text x="260" y="26" text-anchor="middle" class="kbig" fill="#cfdaee">Three levers on one objective</text>
+        <!-- three pillars -->
+        <rect x="30" y="60" width="140" height="120" rx="10" fill="#101c36" stroke="#7aa2ff" stroke-width="1.6"/>
+        <text x="100" y="86" text-anchor="middle" fill="#a9c2ff" font-weight="800" font-size="13">PRODUCT / UX</text>
+        <text x="100" y="108" text-anchor="middle" class="lbls">shapes the moment</text>
+        <text x="100" y="128" text-anchor="middle" class="lbls">modes · gates ·</text>
+        <text x="100" y="143" text-anchor="middle" class="lbls">provenance · nudges</text>
+        <text x="100" y="167" text-anchor="middle" fill="#8fe0b6" class="lbls">ships fastest</text>
+        <rect x="190" y="60" width="140" height="120" rx="10" fill="#101c36" stroke="#2bd4c4" stroke-width="1.6"/>
+        <text x="260" y="86" text-anchor="middle" fill="#2bd4c4" font-weight="800" font-size="13">REWARD / RL</text>
+        <text x="260" y="108" text-anchor="middle" class="lbls">shapes the habit</text>
+        <text x="260" y="128" text-anchor="middle" class="lbls">what the model is</text>
+        <text x="260" y="143" text-anchor="middle" class="lbls">trained to prefer</text>
+        <text x="260" y="167" text-anchor="middle" fill="#ffcc66" class="lbls">deeper · slower</text>
+        <rect x="350" y="60" width="140" height="120" rx="10" fill="#101c36" stroke="#ff9900" stroke-width="1.6"/>
+        <text x="420" y="86" text-anchor="middle" fill="#ff9900" font-weight="800" font-size="13">EVAL</text>
+        <text x="420" y="108" text-anchor="middle" class="lbls">tells you if it worked</text>
+        <text x="420" y="128" text-anchor="middle" class="lbls">measures the</text>
+        <text x="420" y="143" text-anchor="middle" class="lbls">real objective</text>
+        <text x="420" y="167" text-anchor="middle" fill="#ff9a9a" class="lbls">the hardest to get right</text>
+        <!-- converge -->
+        <path d="M100 180 L250 214" class="flow2"/><path d="M260 180 L260 214" class="flow2"/><path d="M420 180 L270 214" class="flow2"/>
+        <rect x="130" y="216" width="260" height="46" rx="10" fill="#0f2018" stroke="#39d98a" stroke-width="2"/>
+        <text x="260" y="238" text-anchor="middle" fill="#8fe0b6" font-weight="700" font-size="12.5">an assistant that leaves the user capable</text>
+        <text x="260" y="254" text-anchor="middle" class="lbls">product without eval is guesswork; eval without reward doesn't scale</text>
+      </svg>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Read the next six slides as this map</h3>
+      <ul class="clean">
+        <li><b>Product/UX (slides 6–8)</b> — the cheapest to ship and the first line of defense: modes, no-guess behavior, provenance, nudges. Reaches users today, no retraining.</li>
+        <li><b>Reward/RL (slides 9–10)</b> — bakes the behavior into the model so it survives outside the scaffold: reward eliciting reasoning, calibrated confidence, self-adversarial checking.</li>
+        <li><b>Eval (slide 11)</b> — the keystone: if you can't measure "surfaced the ambiguity" or "the user could still explain it," you can't reward it or ship it with confidence.</li>
+      </ul></div>
+      ${risk("The levers are not independent, and shipping one alone backfires: a product gate with no reward behind it is bypassed the moment it annoys; a reward with no eval optimizes a proxy you never validated. The order matters — prototype in product, prove in eval, then bake into reward.")}
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> Three places to intervene: <b>what the tool does in the moment (product), what it's trained to prefer (reward), and how you measure success (eval)</b>. The eval is the hard one — and the one everything else depends on.</div>
+  ${foot('05 · Three levers')}
+</div>`);
+
+/* ---- 5. LEVER 1 — MODES ---- */
+slides.push(`
+<div class="slide">
+  <div class="lever">Lever 1 · Product / UX</div>
+  <h2 class="title">Modes that <span class="hl">scope the help</span></h2>
+  <div class="sub">Part III told the human to draw an earn-by-hand vs delegate line. A tool can make that line <b>configuration, not willpower</b>: three interaction tiers, auto-selected by what the work is.</div>
+  <div class="body">
+    <div class="col">
+      <svg class="dg" viewBox="0 0 520 300" preserveAspectRatio="xMidYMid meet">
+        ${DEFS}
+        <rect x="0" y="0" width="520" height="300" fill="#0c1222"/>
+        <text x="260" y="24" text-anchor="middle" class="kbig" fill="#cfdaee">Tier chosen by task type, not mood</text>
+        <rect x="30" y="52" width="150" height="150" rx="12" fill="#101c36" stroke="#7aa2ff" stroke-width="1.6"/>
+        <text x="105" y="78" text-anchor="middle" fill="#a9c2ff" font-weight="800" font-size="14">TUTOR</text>
+        <text x="105" y="100" text-anchor="middle" class="lbls">asks questions until</text>
+        <text x="105" y="115" text-anchor="middle" class="lbls">you derive it</text>
+        <text x="105" y="132" text-anchor="middle" class="lbls">code-emission OFF</text>
+        <text x="105" y="170" text-anchor="middle" fill="#8fe0b6" class="lbls">for: the concept you</text>
+        <text x="105" y="185" text-anchor="middle" fill="#8fe0b6" class="lbls">must own</text>
+        <rect x="190" y="52" width="150" height="150" rx="12" fill="#141f0c" stroke="#39d98a" stroke-width="2.2"/>
+        <text x="265" y="78" text-anchor="middle" fill="#8fe0b6" font-weight="800" font-size="14">SPAR ★</text>
+        <text x="265" y="100" text-anchor="middle" class="lbls">drafts it PLUS a</text>
+        <text x="265" y="115" text-anchor="middle" class="lbls">red-team list of what</text>
+        <text x="265" y="130" text-anchor="middle" class="lbls">it might miss</text>
+        <text x="265" y="170" text-anchor="middle" fill="#8fe0b6" class="lbls">default — draft you</text>
+        <text x="265" y="185" text-anchor="middle" fill="#8fe0b6" class="lbls">must interrogate</text>
+        <rect x="350" y="52" width="140" height="150" rx="12" fill="#101c36" stroke="#63769a" stroke-width="1.4"/>
+        <text x="420" y="78" text-anchor="middle" fill="#cfdaee" font-weight="800" font-size="14">DO</text>
+        <text x="420" y="100" text-anchor="middle" class="lbls">just generates</text>
+        <text x="420" y="115" text-anchor="middle" class="lbls">(today's autocomplete)</text>
+        <text x="420" y="170" text-anchor="middle" fill="#cfdaee" class="lbls">for: boilerplate,</text>
+        <text x="420" y="185" text-anchor="middle" fill="#cfdaee" class="lbls">scaffolding</text>
+        <text x="260" y="230" text-anchor="middle" fill="#ff9900" font-size="12" font-weight="700">scope map: file-glob / task-type → tier</text>
+        <text x="260" y="250" text-anchor="middle" class="lbls">checker · oracle · RCA files → SPAR/TUTOR   ·   glue · scaffold → DO</text>
+        <text x="260" y="270" text-anchor="middle" class="lbls">the lead sets the map once — "the earn-vs-delegate line" becomes config</text>
+      </svg>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Why this is the highest-leverage product move</h3>
+      <ul class="clean">
+        <li><b>Turns exhortation into default.</b> Part III asked the human to choose the hard path; the mode map makes the right tier the one that opens automatically for judgment-critical files.</li>
+        <li><b>Puts the lever where the lead already stands.</b> Configuring the glob→tier map <i>is</i> "set the earn-vs-delegate line" — no per-task policing. <span class="def">(The router is itself a fallible classifier, and one file often mixes trivial ports with load-bearing oracle logic — so make it a per-task <i>default</i>, overridable per turn, not a hard lock.)</span></li>
+        <li><b>SPAR as default is the sweet spot</b> — a draft you must interrogate keeps velocity while forcing a look; TUTOR is opt-in for the concept you truly must own.</li>
+      </ul></div>
+      ${ptag("hollow deliverable")}${ptag("capable-only-when-pushed")}${ptag("atrophy")}
+      ${risk("Biggest adoption cliff in the deck: TUTOR is slower on purpose, and under deadline — Part III's dominant force — users flip to DO, so the at-risk population self-selects out of the help. Force-pinning TUTOR org-wide breeds resentment and re-creates the 'unsafe to ask' culture. Default to SPAR, keep its red-team list to a few lines, and never hard-pin TUTOR at ship time.")}
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> Give the tool a <b>tutor gear, a sparring gear, and a just-do-it gear</b>, and pick the gear by what the file is — so the deep-work files can't be autocompleted away without a look.</div>
+  ${foot('06 · Modes')}
+</div>`);
+
+/* ---- 6. LEVER 1 — REFUSE TO GUESS ---- */
+slides.push(`
+<div class="slide">
+  <div class="lever">Lever 1 · Product / UX</div>
+  <h2 class="title">Refuse to guess — <span class="hl">surface the silence</span></h2>
+  <div class="sub">Holmes: "I never guess." The single highest-value place to intervene (Part III slide 12) is ambiguity — because it is where <i>both</i> a junior and a model silently pick a default. Make silent defaulting impossible; make the gap visible instead.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card"><h3>Surface-ambiguity mode</h3>
+      <ul class="clean">
+        <li>When the spec/context is <b>silent</b> on a decision the model must make, it does <b>not</b> silently pick a default.</li>
+        <li>It emits a ranked <b>"what your inputs are silent on"</b> list, and flags each guessed branch inline as a dismissible chip: <b>ASSUMED (no source): X — confirm / correct</b>, right at the code site.</li>
+        <li>Confirmed answers optionally <b>write back to a shared spec / decision record</b> — so the negative space closes for everyone, not just this session.</li>
+      </ul></div>
+      <div class="card" style="margin-top:10px"><h3>Explain-back gate (high-stakes only)</h3>
+      <p class="small">For earn-by-hand edits (protocol behavior, checker-to-spec, RCA, oracle definition), <b>Generate</b> unlocks only after the user states their expected behavior in a line or two — then the tool leads its reply with the <b>delta</b> between prediction and result (Part III's predict-then-verify, enforced by the UI).</p></div>
+    </div>
+    <div class="col">
+      <svg class="dg" style="height:190px;flex:none" viewBox="0 0 520 220" preserveAspectRatio="xMidYMid meet">
+        ${DEFS}
+        <rect x="0" y="0" width="520" height="220" fill="#0c1222"/>
+        <rect x="30" y="40" width="150" height="44" rx="9" class="box"/><text x="105" y="60" text-anchor="middle" class="lbls">spec is silent on</text><text x="105" y="76" text-anchor="middle" class="lbls">a decision</text>
+        <path d="M180 62 L230 62" class="flowR"/>
+        <rect x="230" y="30" width="120" height="30" rx="6" fill="#25121a" stroke="#ff6b6b"/><text x="290" y="50" text-anchor="middle" fill="#ff9a9a" class="lbls">✗ silently default</text>
+        <path d="M180 62 L230 96" class="flow2"/>
+        <rect x="230" y="82" width="260" height="30" rx="6" fill="#0f2018" stroke="#39d98a"/><text x="360" y="102" text-anchor="middle" fill="#8fe0b6" class="lbls">✓ ASSUMED (no source): X — confirm/correct</text>
+        <path d="M360 112 L360 150" class="flow2"/>
+        <rect x="250" y="150" width="220" height="40" rx="8" fill="#101c36" stroke="#7aa2ff"/><text x="360" y="167" text-anchor="middle" fill="#a9c2ff" class="lbls">confirmed → write back to</text><text x="360" y="182" text-anchor="middle" fill="#a9c2ff" class="lbls">shared spec / decision record</text>
+      </svg>
+      ${ptag("guess-on-ambiguity")}${ptag("hollow deliverable")}
+      ${risk("Over-flagging is fatal: flag every trivial choice and users click through without reading — complacency at the chip level; flag only load-bearing gaps. The <b>explain-back gate</b> is the most intrusive idea here — a hard block on Generate, dropped exactly where users are most time-pressured — so ship it <b>opt-in / once-per-session</b>, not as a routine wall. And <b>write-back is a full integration</b> (write access, schema, conflict handling) that crosses a privacy / data-governance boundary — a separate governed feature, not a toggle on this one.")}
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> When the tool doesn't actually know, make it <b>say so at the exact spot</b> and ask — instead of quietly guessing and moving on. A guess you can see is a question; a guess you can't is a bug.</div>
+  ${foot('07 · Refuse to guess')}
+</div>`);
+
+/* ---- 7. LEVER 1 — SHOW YOUR WORK ---- */
+slides.push(`
+<div class="slide">
+  <div class="lever">Lever 1 · Product / UX</div>
+  <h2 class="title">Show your work — <span class="hl">provenance on verdicts, not just code</span></h2>
+  <div class="sub">Part III slide 8: a model confidently blamed innocent RTL; the real bug was a mis-bound comparison. A bare verdict hands the user a conclusion to accept; a <i>structured</i> verdict hands them the thread to check.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card"><h3>Verdict schema — enforced output</h3>
+      <p class="small">Any causal conclusion ("the design is buggy", "this failure is caused by X") must ship as a structured object, never a bare sentence:</p>
+      <ul class="clean">
+        <li><b>claim</b> — the conclusion</li>
+        <li><b>evidence_spans</b> — resolvable pointers to logs/lines/spec (checkable)</li>
+        <li><b>competing_hypothesis</b> — the most likely alternative</li>
+        <li><b>what_would_disconfirm_me</b> — the cheapest test that kills the claim</li>
+      </ul>
+      <p class="small" style="margin-top:8px">If it can't cite a resolvable trace, it must say <b>"asserted, not derived."</b> On the recap's oracle-trap bug, that schema would have surfaced "competing hypothesis: the checker reference is mis-bound" — handing the user the very thread that exonerated the RTL.</p></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Pattern-B self-direction nudge</h3>
+      <p class="small">Detect the Part III <b>Pattern-B signature</b> — high accept-rate, near-zero self-initiated "why/what-if" turns, no rejections — and at commit/PR time inject <b>one</b> self-probe from the skeptic checklist ("what would make this pass while the design is broken?"), then <b>wait</b> without auto-answering. It moves the probe from the lead into the loop.</p></div>
+      ${ptag("accept-oracle-blindly")}${ptag("capable-only-when-pushed")}
+      ${risk("Provenance costs length and reads as hedging — some users equate a confident verdict with competence and trust the schema-driven answer less (a real trust-perception tax). Worse, the competing-hypothesis field can itself be generated hollowly, so it is only worth anything paired with the checkable evidence-span. The Pattern-B nudge needs per-user behavioral telemetry, which in many regulated / works-council / enterprise deployments is <b>collection-gated by contract — un-computable, not just un-shareable</b>; where it is allowed, keep it private to the user and never a metric a lead sees, or it becomes the micromanagement Part III warned against.")}
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> Don't let the tool just say "it's the design's fault." Make it show <b>the evidence, the runner-up explanation, and what would prove it wrong</b> — so the user checks a claim instead of swallowing a verdict.</div>
+  ${foot('08 · Show your work')}
+</div>`);
+
+/* ---- 8. LEVER 2 — REWARD THE REASONING ---- */
+slides.push(`
+<div class="slide">
+  <div class="lever">Lever 2 · Reward / RL</div>
+  <h2 class="title">Reward the reasoning, <span class="hl">not just the answer</span></h2>
+  <div class="sub">Product gates are bypassed the moment they annoy. To make the behavior survive outside the scaffold, it has to be in what the model is <i>trained to prefer</i>. Two reward ideas — the first grows self-direction, the second kills confident-wrongness.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card"><h3>Reward eliciting the user's reasoning <span class="def" style="font-weight:400">— research-grade</span></h3>
+      <p class="small">A <b>learned interaction-level reward</b> scored on the whole <b>trajectory</b>: did a later user turn contain novel reasoning, a correction, or a testable prediction? Reward the assistant for <i>drawing that out</i>, gated to ownership-flagged contexts so it never sabotages a genuine "just give me boilerplate." <span class="def">(Not a process-reward model in the usual sense — a PRM scores the model's OWN steps against per-step labels; this scores a downstream human turn, an open and harder signal.)</span></p>
+      ${ptag("capable-only-when-pushed")}${ptag("accept-oracle-blindly")}</div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Penalize confident-and-wrong — at the right layer</h3>
+      <p class="small">Keep a <b>proper scoring rule</b> <span class="def">(log / Brier — uniquely maximized by reporting your TRUE probability)</span> on the model's <b>reported confidence</b>, over claims with recoverable ground truth (RCA outcomes, CI pass/fail, grep-checkable clauses). Put the <b>asymmetry on the downstream act</b> — a confident-wrong <i>action</i> costs far more than a hedged one. <span class="def">(Bolting an asymmetric penalty onto the report itself breaks properness — it just trains under-confidence, the very hedging the risk box warns of.)</span> Add a term for naming the single load-bearing assumption — which turns the oracle-trap (recap) into a sparring prompt.</p>
+      ${ptag("accept-oracle-blindly")}${ptag("guess-on-ambiguity")}</div>
+      ${risk("Calibration trains on VERIFIABLE ground truth and transfers poorly to the open-ended design-judgment tail where confident-wrongness is most dangerous — it is necessary, not sufficient (pair it with the transfer eval, slide 11). It can also breed chronic hedging that users learn to ignore — the hedge becomes noise, automation complacency one level up. And the trajectory reward's signal ('did the user actually reason?') is noisy, confounded (did the tool elicit it, or would the user have anyway? — needs a control), and gameable by rubber-stamping.")}
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> Train the model so that <b>drawing out the user's thinking scores well, and being confidently wrong on a checkable claim scores terribly</b> — not just that the final answer matched. (Extending that honesty to open-ended judgment is still an open problem.)</div>
+  ${foot('09 · Reward the reasoning')}
+</div>`);
+
+/* ---- 9. LEVER 2 — ATTACK YOUR OWN GREEN ---- */
+slides.push(`
+<div class="slide">
+  <div class="lever">Lever 2 · Reward / RL</div>
+  <h2 class="title">Make it <span class="hl">attack its own green</span></h2>
+  <div class="sub">The recursion Part III named: a reasoning artifact is as gameable as the code — a model will produce a convincing derivation on command. So don't reward that a rationale <i>exists</i>; reward that it <b>survives an attack</b>.</div>
+  <div class="body">
+    <div class="col">
+      <svg class="dg" viewBox="0 0 520 300" preserveAspectRatio="xMidYMid meet">
+        ${DEFS}
+        <rect x="0" y="0" width="520" height="300" fill="#0c1222"/>
+        <rect x="180" y="40" width="160" height="44" rx="9" fill="#0f2018" stroke="#39d98a"/><text x="260" y="61" text-anchor="middle" fill="#8fe0b6" class="lbls">draft artifact + its</text><text x="260" y="77" text-anchor="middle" fill="#8fe0b6" class="lbls">passing derivation</text>
+        <path d="M260 84 L260 116" class="flowO"/>
+        <rect x="120" y="118" width="280" height="52" rx="10" fill="#221a08" stroke="#ff9900" stroke-width="1.8"/>
+        <text x="260" y="139" text-anchor="middle" fill="#ff9900" font-weight="700" font-size="12">distinct adversarial pass on ITSELF</text>
+        <text x="260" y="157" text-anchor="middle" class="lbls">"what input passes this while the thing it checks is broken?"</text>
+        <path d="M200 170 L200 206" class="flowR"/><path d="M320 170 L320 206" class="flow2"/>
+        <rect x="120" y="208" width="150" height="40" rx="8" fill="#25121a" stroke="#ff6b6b"/><text x="195" y="232" text-anchor="middle" fill="#ff9a9a" class="lbls">doesn't survive → kill</text>
+        <rect x="290" y="208" width="150" height="40" rx="8" fill="#0f2018" stroke="#39d98a"/><text x="365" y="232" text-anchor="middle" fill="#8fe0b6" class="lbls">survives → reward</text>
+        <text x="260" y="275" text-anchor="middle" class="lbls">reward = quality × survives an INDEPENDENT probe (not: a trace exists)</text>
+      </svg>
+    </div>
+    <div class="col">
+      <div class="card"><h3>The critic must be independent — a requirement, not a nicety</h3>
+      <p class="small">If <i>one</i> reward channel scores both the artifact and its own probe, the joint optimum is <b>collusion</b>: emit a weak probe it always survives. So the probe needs its <b>own break-finding objective</b> — a <b>tool-grounded</b> critic (in DV it can actually compute a check's precondition fire-rate / vacuity status — a fact) or a <b>genuinely independent</b> model. The fire-rate is a fact; whether that rate is <i>anomalous</i> is a judgment against a spec- or coverage-derived expected rate — a rare-corner check <i>should</i> fire rarely.</p></div>
+      ${ptag("hollow deliverable")}${ptag("recursion / gameable artifact")}
+      ${risk("Two distinct failure modes. (1) Collusion: fold the probe into the same reward and the model learns a probe so weak everything survives — a self-play equilibrium that produces the deck's own worst outcome, a confidently-annotated hollow deliverable. (2) Correlated blind spots: even an honest self-critic shares the generator's weaknesses, under-detecting exactly what it is worst at. Both demand an independent or tool-grounded critic scored on its own objective — and it roughly doubles inference cost.")}
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> Before the tool shows you a green result, make it <b>try to break its own result</b> — and only reward the green that survives the attack, not the green that came with a nice-sounding explanation.</div>
+  ${foot('10 · Attack its own green')}
+</div>`);
+
+/* ---- 10. LEVER 3 — EVAL ---- */
+slides.push(`
+<div class="slide">
+  <div class="lever">Lever 3 · Eval</div>
+  <h2 class="title">Measure the right thing — <span class="hl">or reward the wrong one</span></h2>
+  <div class="sub">Reward and product both depend on an eval that captures the real objective. Two evals make the un-measurable measurable: did it surface the ambiguity, and did the user actually learn?</div>
+  <div class="body">
+    <div class="col">
+      <div class="card"><h3>Ambiguity-recovery eval (constraint ablation)</h3>
+      <p class="small">Take well-specified tasks, <b>ablate</b> key constraints, and reward the model for recovering the ablated constraints <b>as questions</b> — not for silently resolving them. The <b>present→removed→recovered</b> check is exactly verifiable <span class="def">(RLVR-style: reward from an automatic check)</span>; <i>which</i> constraints are load-bearing is a subjective design choice, so weight by counterfactual impact and make precision dominate (or "ask about everything" hacks the recall). Backbone under slide 7's no-guess mode.</p>
+      ${ptag("guess-on-ambiguity")}</div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Student-transfer eval (did it teach?) <span class="def" style="font-weight:400">— diagnostic, not a reward</span></h3>
+      <p class="small">Sample interactions, then quiz a <b>held-out / rotating</b> student model (and, opt-in, real users) on the mechanism <b>with the artifact removed</b>. A response that leaves the user able to explain it beats one that leaves them blank — the most direct read on "fostered understanding." Keep it a <b>diagnostic eval, not a reward source</b>: rewarding a single proxy-student just teaches-to-the-proxy (the slide-12 rule, applied to ourselves), and attribution needs a control (did the tool cause the gain?).</p>
+      ${ptag("hollow deliverable")}${ptag("atrophy")}</div>
+      ${risk("Both evals are hard on purpose — they measure the goal, not a proxy — but each has a sharp edge: ambiguity-recovery over-triggers into a clarification-question machine users route around, and its gap-set is contested; student-transfer is delayed, sparse, hard to attribute, and gameable the moment it becomes a reward. These are why eval is the keystone lever and the last one you should automate into training.")}
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> Build two hard tests: <b>did the tool ask about what the spec left unsaid</b>, and <b>can the user still explain the answer with the tool taken away</b>. If you can measure those, you can train for them.</div>
+  ${foot('11 · Measure the right thing')}
+</div>`);
+
+/* ---- 11. HONEST TRADEOFFS ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The honest part</div>
+  <h2 class="title">Every mechanism can be gamed <span class="hl">one level up</span></h2>
+  <div class="sub">This is Part II's lesson turned on ourselves. None of these is free, and each recreates a failure at a higher level if shipped naively. A builder who ignores that ships the very pitfalls they meant to fix.</div>
+  <div class="body">
+    <div class="col">
+      <table class="matrix">
+        <tr><th>Mechanism</th><th>How it backfires</th></tr>
+        <tr><td><b>Modes / gates</b></td><td>Friction under deadline → users flip to DO or disable it; the at-risk user opts out.</td></tr>
+        <tr><td><b>No-guess flags</b></td><td>Over-flag → click-through; complacency at the chip level.</td></tr>
+        <tr><td><b>Provenance / hedging</b></td><td>Alarm fatigue; users learn to ignore the hedge — the hedge becomes noise.</td></tr>
+        <tr><td><b>Self-attack</b></td><td>Shares the generator's blind spots; can produce a confident hollow artifact.</td></tr>
+        <tr><td><b>Pattern-B telemetry</b></td><td>If a lead sees it, becomes a gamed metric = the micromanagement we opposed.</td></tr>
+      </table>
+    </div>
+    <div class="col">
+      <div class="card"><h3>The meta-rule for builders</h3>
+      <ul class="clean">
+        <li><b>Reward survival, not existence.</b> A rationale, a hedge, a clarifying question can all be produced hollowly. Reward the ones that <i>survive an adversarial check</i> — never the ones that merely appear.</li>
+        <li><b>Watch for complacency at the new level.</b> Any signal shown often enough gets ignored; any friction added gets routed around. Design assuming your own mechanism will be gamed.</li>
+        <li><b>Keep agency with the human.</b> The tool makes the probe cheaper and more frequent — it never <i>certifies</i> understanding, because (Part III slide 4) understanding isn't observable in any artifact the tool can produce.</li>
+        <li><b>Count the cost — it compounds.</b> These mechanisms stack: verdict schema, a self-attack pass (~2× inference), calibration reasoning, extra turns. The honest baseline is a fast "just do it" assistant, and the capability gain has to beat a real per-turn latency-and-cost tax — the top driver of abandonment.</li>
+      </ul></div>
+      ${risk("The deepest trap: a mechanism that makes hollow work look earned is worse than no mechanism — it defeats the human reviewer's instinct that something is thin. If you can't ground a check (tool-verified fact, independent critic, recoverable ground truth), you may be adding confidence without adding correctness — the exact thing this whole series warns against.")}
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> Assume users will game every guardrail you add — and assume your model will too. <b>Reward what survives an attack, not what merely shows up</b>, and never let the tool claim it has verified understanding it cannot see.</div>
+  ${foot('12 · Honest tradeoffs')}
+</div>`);
+
+/* ---- 12. UNIFYING THREAD ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The one thread</div>
+  <h2 class="title">Wrong-and-confident is the enemy — <span class="hl">calibration is the spine</span></h2>
+  <div class="sub">Across product, reward, and eval, one property links every mechanism worth building. The danger was never that the model is sometimes wrong — a calibrated one that <i>says so</i> turns each failure into a sparring prompt.</div>
+  <div class="body">
+    <div class="col">
+      <svg class="dg" viewBox="0 0 520 280" preserveAspectRatio="xMidYMid meet">
+        ${DEFS}
+        <rect x="0" y="0" width="520" height="280" fill="#0c1222"/>
+        <line x1="60" y1="235" x2="470" y2="235" stroke="#2b3a5e" stroke-width="1.5"/>
+        <line x1="120" y1="30" x2="120" y2="235" stroke="#2b3a5e" stroke-width="1.5" stroke-dasharray="3 3"/>
+        <text x="270" y="262" text-anchor="middle" class="lbls">confidence →</text>
+        <text x="42" y="130" text-anchor="middle" class="lbls" transform="rotate(-90 42 130)">correctness →</text>
+        <circle cx="180" cy="70" r="8" fill="#39d98a"/><text x="180" y="56" text-anchor="middle" fill="#8fe0b6" class="lbls">right + confident ✓</text>
+        <circle cx="180" cy="200" r="9" fill="#ff6b6b"/><text x="180" y="222" text-anchor="middle" fill="#ff9a9a" class="lbls">WRONG + confident — the enemy</text>
+        <circle cx="370" cy="120" r="7" fill="#ffcc66"/><text x="370" y="104" text-anchor="middle" fill="#ffe1a3" class="lbls">unsure + says so →</text>
+        <text x="370" y="140" text-anchor="middle" fill="#ffe1a3" class="lbls">becomes a sparring prompt</text>
+        <text x="270" y="24" text-anchor="middle" class="kbig" fill="#cfdaee">the tool should know — and show — what it doesn't know</text>
+      </svg>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Calibration is what ties the deck together</h3>
+      <ul class="clean">
+        <li><b>Provenance (slide 8)</b> exposes confidence as evidence — a claim you can weigh.</li>
+        <li><b>Asymmetric reward (slide 9)</b> makes confident-wrong the most expensive output.</li>
+        <li><b>Self-attack (slide 10)</b> is the model measuring its own confidence against an attack.</li>
+        <li><b>A tool that flags its own uncertainty</b> converts the oracle-trap into an invitation to think — the single behavior that most directly grows the user.</li>
+      </ul>
+      <p class="small" style="margin-top:9px">This is the same thread with three faces across the series: <b>calibrated confidence</b> (Part I — a "high" verdict only when you've actually ruled the alternatives out), <b>calibrated trust</b> (Part III — trust the model where verifying is cheap, doubt it where being wrong is expensive), and here <b>a calibrated tool</b> that shows what it doesn't know.</p></div>
+      <div class="cite">Related public ideas — <b>calibration / proper scoring rules</b>, <b>process reward models</b>, <b>RL with verifiable rewards</b>, and human-factors work on <b>automation complacency</b> (Parasuraman &amp; Riley). <i>Directions, several research-grade; attributions to be verified against primary sources before publication.</i></div>
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> The fix that runs through everything: <b>build a tool that knows what it doesn't know and says so.</b> A confident wrong answer traps the user; an honest "I'm not sure, here's why" invites them to think.</div>
+  ${foot('13 · The unifying thread')}
+</div>`);
+
+/* ---- 13. CLOSE ---- */
+slides.push(`
+<div class="slide cover">
+  <div class="kicker">The through-line</div>
+  <h2 class="title" style="font-size:38px">The tool worth building is the one that <span class="hl">makes its user need it less</span></h2>
+  <div class="quote" style="margin-top:14px;font-size:22px">
+    Part III asked the human to earn judgment. Part IV asks the <span class="hl">builder</span> to make the tool foster it — by scoping the help, refusing to guess, showing its work, rewarding reasoning over answers, attacking its own green, and measuring whether the user actually grew. All of it reduces to one property: <span class="hl">know what you don't know, and show it.</span>
+  </div>
+  <div class="epi" style="margin-top:16px">
+    <p>"Education never ends, Watson. It is a series of lessons, with the greatest for the last."</p>
+    <span class="att">— Arthur Conan Doyle, Sherlock Holmes · a tool that teaches is one whose lessons don't end when the task does — it leaves the user readier for the next, harder one.</span>
+  </div>
+  <div class="badgerow" style="margin-top:20px">
+    <div class="badge"><b>Grade the tool on the user's capability, not the task's completion</b></div>
+    <div class="badge"><b>Never guess silently — surface the doubt</b></div>
+    <div class="badge"><b>Reward what survives an attack, not what merely appears</b></div>
+    <div class="badge"><b>Calibration is the spine</b></div>
+  </div>
+  <div class="sub" style="margin-top:18px">These are directions, not shipped features — several are open research problems, and every one can be gamed one level up. But the target is clear and it closes the series: verification moves up to independent proof (Part II), the human earns the judgment to supply it (Part III), and the tools we build should <b>sharpen that judgment rather than quietly spend it down</b> (Part IV). Build the assistant that argues with you — not the one that answers for you.</div>
+  ${foot('14 · Close')}
+</div>`);
+
+/* ============================ ENGINE ============================ */
+const deck = document.getElementById('deck');
+deck.innerHTML = slides.join('');
+const S = [...document.querySelectorAll('.slide')];
+let i = 0;
+function show(n){
+  i = Math.max(0, Math.min(S.length-1, n));
+  S.forEach((s,k)=>s.classList.toggle('active', k===i));
+  document.getElementById('prog').style.width = ((i)/(S.length-1)*100)+'%';
+  document.getElementById('num').textContent = (i+1)+' / '+S.length;
+  location.hash = i+1;
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' ') {show(i+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'||e.key==='PageUp'){show(i-1);e.preventDefault();}
+  else if(e.key==='Home'){show(0);}
+  else if(e.key==='End'){show(S.length-1);}
+  else if(e.key.toLowerCase()==='f'){if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen();}
+  else if(e.key.toLowerCase()==='p'){window.print();}
+  else if(e.key.toLowerCase()==='o'){document.body.classList.toggle('ov');}
+});
+deck.addEventListener('click',e=>{ if(e.clientX > window.innerWidth*0.62) show(i+1); else if(e.clientX < window.innerWidth*0.18) show(i-1); });
+const start = parseInt(location.hash.replace('#',''))||1; show(start-1);
+</script>
+</body>
+</html>

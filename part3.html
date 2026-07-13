@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Learning to Verify — Building Deep DV Judgment in the Era of LLMs (Part III)</title>
+<style>
+  :root{
+    --bg:#0c1222; --bg2:#111a30; --panel:#16203a; --panel2:#1d2a49;
+    --ink:#e9eef7; --muted:#9fb0cc; --line:#2b3a5e;
+    --accent:#ff9900;     /* primary accent */
+    --accent2:#2bd4c4;    /* teal */
+    --accent3:#7aa2ff;    /* blue */
+    --good:#39d98a; --warn:#ffcc66; --bad:#ff6b6b;
+    --dut:#ff9900; --tb:#2bd4c4; --ref:#7aa2ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, #17233f 0%, var(--bg) 55%);
+    color:var(--ink); font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+  #deck{height:100vh;width:100vw;position:relative}
+  .slide{
+    position:absolute;inset:0;display:none;flex-direction:column;
+    padding:44px 64px 70px;opacity:0;transition:opacity .25s ease;
+  }
+  .slide.active{display:flex;opacity:1}
+  h1,h2,h3{margin:0;line-height:1.12}
+  .kicker{color:var(--accent);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:13px;margin-bottom:10px}
+  h2.title{font-size:35px;font-weight:800;letter-spacing:-.5px}
+  h2.title .hl{color:var(--accent)}
+  .sub{color:var(--muted);font-size:15.5px;margin-top:9px;max-width:1090px;line-height:1.5}
+  .sub b{color:#cfe}
+  .body{flex:1;display:flex;gap:26px;margin-top:16px;min-height:0}
+  .col{flex:1;min-width:0}
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:14px;padding:15px 17px}
+  .card h3{font-size:15px;color:var(--accent2);margin-bottom:7px;letter-spacing:.02em}
+  ul.clean{margin:5px 0 0;padding-left:18px}
+  ul.clean li{margin:6px 0;color:#cfdaee;font-size:14px;line-height:1.46}
+  ul.clean li b{color:#fff}
+  .ai{background:linear-gradient(180deg,#241a08,#1a1405);border:1px solid #6b4c12;border-radius:12px;padding:12px 15px;margin-top:12px}
+  .ai .tag{color:var(--accent);font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  .ai p{margin:6px 0 0;color:#f0dcb8;font-size:13.5px;line-height:1.46}
+  .ai .bulb{width:16px;height:16px;display:inline-block}
+  .footer{position:absolute;left:64px;right:64px;bottom:24px;display:flex;justify-content:space-between;align-items:center;color:#63769a;font-size:12.5px;border-top:1px solid var(--line);padding-top:12px}
+  .footer .brand{font-weight:700;color:#8fa3c6;letter-spacing:.04em}
+  .progress{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);transition:width .25s}
+  .num{position:absolute;right:20px;bottom:22px;color:#5b6d90;font-size:12px}
+  .hint{position:absolute;left:20px;bottom:22px;color:#3d4c6b;font-size:11px}
+  svg{width:100%;height:100%;display:block}
+  .dg{width:100%;height:100%;min-height:0}
+  text{font-family:"Segoe UI",Roboto,Arial,sans-serif}
+  .lbl{fill:var(--ink);font-size:13px}
+  .lbls{fill:var(--muted);font-size:11px}
+  .box{fill:var(--panel2);stroke:var(--line);stroke-width:1.4}
+  .flow{stroke:var(--muted);stroke-width:2;fill:none;marker-end:url(#arr)}
+  .flow2{stroke:var(--accent2);stroke-width:2;fill:none;marker-end:url(#arrT)}
+  .flowO{stroke:var(--accent);stroke-width:2.4;fill:none;marker-end:url(#arrO)}
+  .flowR{stroke:var(--bad);stroke-width:2;fill:none;marker-end:url(#arrR)}
+  .kbig{fill:#fff;font-weight:700;font-size:15px}
+  .cover{align-items:flex-start;justify-content:center}
+  .cover .chip{width:104px;height:104px;margin-bottom:20px}
+  .cover h1{font-size:52px;font-weight:800;letter-spacing:-1px;max-width:1120px}
+  .cover h1 .hl{color:var(--accent)}
+  .cover .tagline{color:var(--muted);font-size:19px;margin-top:16px;max-width:960px;line-height:1.5}
+  .badgerow{margin-top:22px;display:flex;gap:12px;flex-wrap:wrap}
+  .badge{background:#16203a;border:1px solid var(--line);border-radius:10px;padding:9px 15px;font-size:13.5px;color:#cfe;}
+  .badge b{color:var(--accent)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+  .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px}
+  .note{color:var(--muted);font-size:12.6px;font-style:italic;margin-top:8px}
+  .note b{color:#cfe;font-style:normal}
+  .quote{font-size:24px;font-weight:600;line-height:1.4;max-width:1050px;color:#fff}
+  .quote .hl{color:var(--accent)}
+  .small{font-size:13.2px;color:#cfdaee;line-height:1.46}
+  .small b{color:#fff}
+  .ex{background:#0f1b31;border:1px dashed #3a4d78;border-radius:10px;padding:9px 13px;margin-top:9px;font-size:13px;color:#cfdaee;line-height:1.45}
+  .ex .xt{color:var(--accent3);font-weight:800;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;margin-right:8px}
+  .ex b{color:#fff}
+  table.matrix{width:100%;border-collapse:collapse;font-size:12.8px}
+  table.matrix th,table.matrix td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.matrix th{background:#1b2743;color:var(--accent2);font-weight:700}
+  table.matrix td b{color:#fff}
+  table.matrix tr:nth-child(even) td{background:#111a30}
+  .disc{position:fixed;top:10px;right:16px;font-size:10.5px;color:#3d4c6b}
+  .contact{color:var(--muted);font-size:14px;margin-top:18px}
+  .contact b{color:#cfe}
+  .xlink{margin-top:10px;font-size:13.5px}
+  .xlink a{color:var(--accent2);text-decoration:none;border-bottom:1px dotted var(--accent2)}
+  .toc{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  .agrow{display:flex;align-items:center;gap:16px;background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:12px;padding:9px 18px;cursor:pointer;transition:border-color .15s ease,transform .15s ease}
+  .agrow:hover{border-color:var(--accent);transform:translateX(5px)}
+  .agrow .n{flex:0 0 32px;height:32px;border-radius:9px;background:#1b2743;color:var(--accent);font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+  .agrow .t{font-size:14.5px;color:#fff;font-weight:700}
+  .agrow .d{font-size:12.2px;color:var(--muted);margin-top:1px}
+  .agrow .pg{margin-left:auto;color:#63769a;font-size:12px;white-space:nowrap;padding-left:14px}
+  .def{color:#9fb0cc;font-weight:400}
+  .eduband{background:#0f2320;border:1px solid var(--accent2);border-radius:12px;padding:12px 16px;margin-top:20px;max-width:1000px;color:#bfeee7;font-size:14px;line-height:1.5}
+  .eduband b{color:var(--accent2)}
+  .edutag{position:fixed;top:10px;left:16px;font-size:10.5px;color:#0c1222;background:var(--accent2);border-radius:5px;padding:2px 9px;font-weight:800;letter-spacing:.06em;z-index:5}
+  .plain{margin-top:8px;font-size:14.5px;line-height:1.4;color:#dfe9ff;background:#122038;border-left:3px solid var(--accent2);border-radius:0 8px 8px 0;padding:7px 13px;max-width:1080px}
+  .plain b{color:var(--accent2);font-weight:700}
+  .plain .lvl{color:var(--accent2);font-weight:800;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-right:8px}
+  .lens{display:flex;gap:12px;margin-top:9px;max-width:1080px;flex-wrap:wrap}
+  .lens .l2{flex:1;min-width:300px;border-radius:0 8px 8px 0;padding:7px 13px;font-size:13px;line-height:1.42;color:#dfe9ff}
+  .lens .lic{border-left:3px solid var(--accent3);background:#111c33}
+  .lens .llead{border-left:3px solid var(--accent);background:#221a08}
+  .lens .ll{font-weight:800;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;margin-right:8px}
+  .lens .lic .ll{color:var(--accent3)}
+  .lens .llead .ll{color:var(--accent)}
+  .lens b{color:#fff}
+  .epi{border-left:3px solid var(--accent);padding:6px 0 6px 18px;margin:18px 0 0;max-width:1000px}
+  .epi p{margin:0;color:#e9eef7;font-size:16px;font-style:italic;line-height:1.5}
+  .epi .att{color:var(--muted);font-size:12.8px;font-style:normal;margin-top:7px;display:block}
+  .cite{margin-top:8px;font-size:11.5px;color:#5b6d90;font-style:normal}
+  .cite b{color:#8fa3c6;font-style:normal}
+  @media print{
+    body{overflow:visible;background:#0c1222 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #deck{height:auto}
+    .slide{display:flex !important;opacity:1 !important;position:relative;height:100vh;page-break-after:always;inset:auto}
+    .progress,.num,.hint{display:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="disc">Educational • Generic industry example • No proprietary/program-specific content</div>
+<div class="edutag">EDUCATION ONLY</div>
+<div id="deck"></div>
+<div class="progress" id="prog"></div>
+<div class="num" id="num"></div>
+<div class="hint">← → navigate · F fullscreen · O overview · P print/PDF</div>
+
+<script>
+/* ============================ SLIDE CONTENT ============================ */
+const bulb = '<svg class="bulb" viewBox="0 0 24 24" fill="none" stroke="#ff9900" stroke-width="2"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10c1 1 1.5 2 1.5 3h5c0-1 .5-2 1.5-3A6 6 0 0 0 12 3z"/></svg>';
+/* ai() and foot() take DOUBLE-quoted args so apostrophes inside are harmless; interior quotes use curly “ ” */
+function ai(txt){return `<div class="ai"><div class="tag">${bulb} Where the LLM helps a learner — and where it quietly hurts</div><p>${txt}</p></div>`;}
+function foot(t){return `<div class="footer"><span class="brand">Design Verification — Foundations · Part III</span><span>${t}</span></div>`;}
+/* dual-perspective callout — IC (blue) and LEAD (orange) */
+function lens(ic,lead){return `<div class="lens"><div class="l2 lic"><span class="ll">IC →</span>${ic}</div><div class="l2 llead"><span class="ll">Lead →</span>${lead}</div></div>`;}
+
+const DEFS = `<defs>
+  <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9fb0cc"/></marker>
+  <marker id="arrT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2bd4c4"/></marker>
+  <marker id="arrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff9900"/></marker>
+  <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff6b6b"/></marker>
+</defs>`;
+
+const slides = [];
+
+/* ---- 1. COVER ---- */
+slides.push(`
+<div class="slide cover">
+  <svg class="chip" viewBox="0 0 120 120">
+    <rect x="26" y="26" width="68" height="68" rx="8" fill="#16203a" stroke="#ff9900" stroke-width="2.5"/>
+    <rect x="42" y="42" width="36" height="36" rx="4" fill="#1d2a49" stroke="#2bd4c4" stroke-width="2"/>
+    <text x="60" y="64" fill="#2bd4c4" font-size="12" text-anchor="middle" font-weight="700">DUT</text>
+    ${[...Array(5)].map((_,i)=>`<line x1="${34+i*13}" y1="26" x2="${34+i*13}" y2="12" stroke="#7aa2ff" stroke-width="2"/><line x1="${34+i*13}" y1="94" x2="${34+i*13}" y2="108" stroke="#7aa2ff" stroke-width="2"/><line x1="26" y1="${34+i*13}" x2="12" y2="${34+i*13}" stroke="#7aa2ff" stroke-width="2"/><line x1="94" y1="${34+i*13}" x2="108" y2="${34+i*13}" stroke="#7aa2ff" stroke-width="2"/>`).join('')}
+    <circle cx="60" cy="60" r="52" fill="none" stroke="#2bd4c4" stroke-width="2" stroke-dasharray="4 5" opacity="0.7"/>
+  </svg>
+  <div class="kicker">A foundations primer · Part III</div>
+  <h1>Learning to <span class="hl">Verify</span></h1>
+  <div class="tagline">Building deep DV judgment in the era of LLMs — <b style="color:var(--accent2)">how a newcomer earns the intuition that catches the model when it is confidently wrong, and how a lead builds a team that has it.</b></div>
+  <div class="epi">
+    <p>"You know my method. It is founded upon the observation of trifles."</p>
+    <span class="att">— Sir Arthur Conan Doyle, Sherlock Holmes · the "trifles" are exactly what a shortcut skips — and what judgment is made of.</span>
+  </div>
+  <div class="eduband"><b>Two readers, one deck.</b> Read it as an <b>IC</b> for how to build judgment that lasts; read it as a <b>lead</b> for how to mentor, detect the gap, and staff for it. This teaches how to <i>learn</i> verification — it uses only public, industry-standard ideas and generic examples, and speaks to the craft, not to any specific plan, product, or person.</div>
+  <div class="badgerow">
+    <div class="badge"><b>Audience:</b> new DV engineers (&lt; a few years) — and the leads who grow them</div>
+    <div class="badge"><b>Tension:</b> ship fast with the model — without the model doing the learning</div>
+    <div class="badge"><b>Goal:</b> intuition as deep as if no LLM existed, built faster because one exists</div>
+  </div>
+  <div class="contact"><b>Shrikant Sundaram</b></div>
+  <div class="xlink"><a href="https://slnu.github.io/Design-Verification-Cycle/#1">← Part I: The Design Verification Cycle</a> · <a href="part2.html">← Part II: The Limits of Translation</a> — this deck assumes their vocabulary.</div>
+  ${foot('01 · Title')}
+</div>`);
+
+/* ---- 2. CONTENTS ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">What we'll cover</div>
+  <h2 class="title">Contents <span class="hl">— click any section to jump</span></h2>
+  <div class="sub">Parts I &amp; II were written for the engineer <i>new to DV</i>. Part III is written <b>for the new DV engineer and the lead who grows them</b>: the model can now do much of the visible work — so the danger is not that output is missing, it's that output arrives without the judgment underneath. Every section carries an <b style="color:var(--accent3)">IC lens</b> and a <b style="color:var(--accent)">Lead lens</b> where they diverge.</div>
+  <div class="body"><div class="col">
+    <div class="toc">
+      ${[
+        ['1','The trap — two ways it goes wrong','Two real patterns: the hollow deliverable, and the one who is capable only when pushed','3','4'],
+        ['2','Why the shortcut wins','The forces that tilt the field — deadlines, ambiguity, culture, motivation — and who controls them','5','5'],
+        ['3','Earn by hand vs delegate','The line between muscle a newcomer must grow and toil that is safe to offload','6','6'],
+        ['4','Desirable difficulty','Why the struggle is the mechanism — a concrete predict-then-verify miss that teaches for life','7','7'],
+        ['5','Sparring partner, not oracle','Use the model to interrogate you — and a real case of it being fluent and wrong','8','8'],
+        ['6','The adversarial instinct','The senior probe turned into a habit you run on yourself — with a vacuous-pass example','9','9'],
+        ['7','A practice regimen','Concrete daily and weekly drills for the first years','10','10'],
+        ['8','Deepening or atrophying?','The honest tells, for the IC and for the lead watching the team','11','11'],
+        ['9','So what is the solution?','No industry standard, banning wastes value, policing every task fails — verify it like a chip','12','12'],
+        ['10','Close','The trained reasoner — judgment is rehearsed, not inherited','13','13']
+      ].map(([n,t,d,go,pg])=>`<div class="agrow" onclick="show(${go}-1)"><div class="n">${n}</div><div><div class="t">${t}</div><div class="d">${d}</div></div><div class="pg">slide ${go}</div></div>`).join('')}
+    </div>
+    <div class="note">Through-line from Part II: verification does not disappear when a model can write RTL — it moves <b>up</b> to independent judgment. Part III asks the next question, from both sides: <b>how do you become the person who can do that adjudication</b> — and <b>how do you build a team of them</b> — when the rungs you'd normally climb are auto-completed?</div>
+  </div></div>
+  ${foot('02 · Contents')}
+</div>`);
+
+/* ---- 3. THE TRAP — two real patterns ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The trap</div>
+  <h2 class="title">Two ways it goes wrong <span class="hl">— both look like progress</span></h2>
+  <div class="sub">Two patterns from mentoring newer engineers, told generically. Different failures — same missing thing underneath.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card" style="border-color:#ff6b6b"><h3 style="color:#ff9a9a">Pattern A — the hollow deliverable</h3>
+      <ul class="clean">
+        <li>Asked for a set of <b>missing tests and a test plan</b> for a block. Delivered in <b>three days</b> — complete, structured, plausible. I was impressed.</li>
+        <li>I probed one level down — <i>how does the block's primary interface <span class="def">(the protocol by which it talks to the rest of the chip — its timing and ordering rules)</span> actually behave?</i> — and got <b>a blank</b>.</li>
+        <li>Model-generated. It <b>looked</b> right; the understanding under it hadn't formed. The deliverable passed inspection — but the <b>derivation that would have made it stick never happened, and nothing in the process asked for it.</b></li>
+      </ul></div>
+      <div class="card" style="margin-top:10px;border-color:#ffcc66"><h3 style="color:#ffe1a3">Pattern B — capable only when pushed</h3>
+      <ul class="clean">
+        <li>A different engineer, using an <b>AI coding assistant</b>, shipped work he did not understand.</li>
+        <li>But when I pushed and asked the <b>exact</b> question, he produced the <b>exact right answer</b> — the ability was there.</li>
+        <li>What was missing: he never asked himself. So <b>I had to push every task and micromanage.</b> The judgment had been outsourced — to me.</li>
+      </ul></div>
+    </div>
+    <div class="col">
+      <svg class="dg" viewBox="0 0 520 330" preserveAspectRatio="xMidYMid meet">
+        ${DEFS}
+        <text x="260" y="24" text-anchor="middle" class="kbig" fill="#cfdaee">Same missing part, two shapes</text>
+        <rect x="40" y="46" width="200" height="120" rx="14" fill="#0f2018" stroke="#39d98a" stroke-width="2"/>
+        <text x="140" y="70" text-anchor="middle" fill="#39d98a" font-weight="800" font-size="12">A: surface looks done</text>
+        <ellipse cx="140" cy="120" rx="72" ry="34" fill="#25121a" stroke="#ff6b6b" stroke-dasharray="5 4"/>
+        <text x="140" y="118" text-anchor="middle" fill="#ff9a9a" class="lbls">understanding:</text>
+        <text x="140" y="134" text-anchor="middle" fill="#ff9a9a" class="lbls">empty</text>
+        <rect x="280" y="46" width="200" height="120" rx="14" fill="#221a08" stroke="#ffcc66" stroke-width="2"/>
+        <text x="380" y="70" text-anchor="middle" fill="#ffe1a3" font-weight="800" font-size="12">B: right answer on demand</text>
+        <ellipse cx="380" cy="120" rx="72" ry="34" fill="#16203a" stroke="#7aa2ff"/>
+        <text x="380" y="118" text-anchor="middle" fill="#a9c2ff" class="lbls">understanding:</text>
+        <text x="380" y="134" text-anchor="middle" fill="#a9c2ff" class="lbls">reachable, never self-started</text>
+        <path d="M140 166 L235 214" class="flowO"/>
+        <path d="M380 166 L285 214" class="flowO"/>
+        <rect x="180" y="216" width="160" height="52" rx="10" fill="#101c36" stroke="#ff9900"/>
+        <text x="260" y="238" text-anchor="middle" fill="#ff9900" font-weight="800" font-size="12">the probe</text>
+        <text x="260" y="256" text-anchor="middle" class="lbls">"why is this true?"</text>
+        <text x="260" y="300" text-anchor="middle" class="lbls">In both, the engineer isn't running it —</text>
+        <text x="260" y="316" text-anchor="middle" class="lbls">so it either never happens (A) or falls to the lead (B).</text>
+      </svg>
+    </div>
+  </div>
+  ${lens("In both stories the fix was the same: <b>learn to run the probe on yourself</b>. No one will always be there to ask you the exact question.", "Pattern B is the expensive one: capability without self-direction means <b>you become the bottleneck</b>. If every AI-drafted task needs your push, you didn't save labor — you relocated it to micromanagement.")}
+  ${foot('03 · The trap')}
+</div>`);
+
+/* ---- 4. DIAGNOSIS: conformance vs correctness, applied to the learner ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The diagnosis</div>
+  <h2 class="title">Part II's split — <span class="hl">now applied to the engineer</span></h2>
+  <div class="sub">Part II said: a perfect translator proves <b>conformance</b> ("we built what was asked"), never <b>correctness</b> ("it's actually right"). The same split explains both patterns on the last slide.</div>
+  <div class="body">
+    <div class="col">
+      <svg class="dg" viewBox="0 0 520 320" preserveAspectRatio="xMidYMid meet">
+        <line x1="70" y1="270" x2="470" y2="270" stroke="#2b3a5e" stroke-width="1.5"/>
+        <line x1="70" y1="270" x2="70" y2="40" stroke="#2b3a5e" stroke-width="1.5"/>
+        <text x="270" y="300" text-anchor="middle" class="lbls">CONFORMANCE — does the output look right?</text>
+        <text x="34" y="155" text-anchor="middle" class="lbls" transform="rotate(-90 34 155)">CORRECTNESS — does the engineer understand it?</text>
+        <circle cx="410" cy="222" r="9" fill="#ff6b6b"/><text x="410" y="204" text-anchor="middle" fill="#ff9a9a" class="lbls">Pattern A:</text><text x="410" y="244" text-anchor="middle" fill="#ff9a9a" class="lbls">looks right, hollow</text>
+        <circle cx="300" cy="160" r="9" fill="#ffcc66"/><text x="300" y="142" text-anchor="middle" fill="#ffe1a3" class="lbls">Pattern B:</text><text x="300" y="182" text-anchor="middle" fill="#ffe1a3" class="lbls">right only when pushed</text>
+        <circle cx="410" cy="88" r="9" fill="#39d98a"/><text x="410" y="70" text-anchor="middle" fill="#8fe0b6" class="lbls">the goal:</text><text x="410" y="110" text-anchor="middle" fill="#8fe0b6" class="lbls">ship it AND own it</text>
+        <circle cx="150" cy="90" r="9" fill="#a9c2ff"/><text x="150" y="72" text-anchor="middle" fill="#c9d8ff" class="lbls">learning honestly:</text><text x="150" y="112" text-anchor="middle" fill="#c9d8ff" class="lbls">understand, output rough</text>
+      </svg>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Why the trap is invisible from the outside</h3>
+      <ul class="clean">
+        <li>Conformance is <b>observable in the artifact</b> — you can read the tests, see the plan.</li>
+        <li>Understanding is <b>not</b> in the artifact — it lives in the engineer's head. You cannot read it off the page.</li>
+        <li>So a hollow deliverable and a mastered one <b>look identical</b>. The only way to tell them apart is to <b>probe</b> — which is why the probe must exist, whether self-run (IC) or by the lead.</li>
+      </ul></div>
+      ${ai("The mapping is exact for this audience: the model produces the artifact (a policy output), and grading it by whether it LOOKS right is grading on conformance. A learner who accepts a passing-looking output without deriving it is optimizing the visible reward and starving the real objective — judgment. It is the human version of a benchmark score that doesn't generalize: the eval passed, the capability never formed.")}
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> You can't see understanding, so you can't detect its absence by looking. <b>The green artifact and the earned artifact are indistinguishable until someone asks "why?"</b></div>
+  ${foot('04 · The diagnosis')}
+</div>`);
+
+/* ---- 5. WHY THE SHORTCUT WINS — the forces ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The honest part</div>
+  <h2 class="title">Nobody takes the shortcut <span class="hl">in a vacuum</span></h2>
+  <div class="sub">The reps that follow assume you <i>choose</i> the hard path. But that choice is made under pressure — deadlines, ambiguity, communication norms, and motivation all tilt the field toward the easy way out. Naming the forces is the first defense; for a lead, most of them are dials you actually control.</div>
+  <div class="body">
+    <div class="col">
+      <svg class="dg" viewBox="0 0 520 300" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="s5red" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#ff6b6b"/></marker>
+          <marker id="s5teal" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#39d98a"/></marker>
+          <marker id="s5or" viewBox="0 0 8 8" refX="8" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#ff9900"/></marker>
+        </defs>
+        <rect x="0" y="0" width="520" height="300" fill="#0c1222"/>
+        <text x="260" y="22" text-anchor="middle" class="kbig" fill="#fff">Nobody takes the shortcut in a vacuum</text>
+        <text x="260" y="40" text-anchor="middle" class="lbls" fill="#9fb0cc">the knot lands where the stronger pull drags it</text>
+        <!-- RED pressures — stacked top band -->
+        <text x="260" y="62" text-anchor="middle" fill="#ff9a9a" font-size="11.5" font-weight="700">PRESSURES  →  pull toward the shortcut</text>
+        <text x="260" y="80" text-anchor="middle" fill="#ff9a9a" font-size="11">tight deadlines  ·  unclear / missing docs</text>
+        <text x="260" y="95" text-anchor="middle" fill="#ff9a9a" font-size="11">unsafe to ask  ·  reward = close the ticket</text>
+        <!-- the rope + endpoint destinations -->
+        <line x1="95" y1="150" x2="425" y2="150" stroke="#3a4d78" stroke-width="2"/>
+        <text x="50" y="147" text-anchor="middle" fill="#2bd4c4" font-size="13" font-weight="700">LEARN</text>
+        <text x="50" y="163" text-anchor="middle" fill="#9fb0cc" font-size="9">understand it</text>
+        <text x="474" y="147" text-anchor="middle" fill="#ff6b6b" font-size="13" font-weight="700">SHORTCUT</text>
+        <text x="474" y="163" text-anchor="middle" fill="#9fb0cc" font-size="9">hollow output</text>
+        <!-- opposing pulls on the rope: red thicker (winning), teal thinner -->
+        <line x1="284" y1="150" x2="224" y2="150" stroke="#39d98a" stroke-width="3" marker-end="url(#s5teal)"/>
+        <line x1="336" y1="150" x2="408" y2="150" stroke="#ff6b6b" stroke-width="7" marker-end="url(#s5red)"/>
+        <!-- the knot, displaced toward SHORTCUT = the net result -->
+        <circle cx="310" cy="150" r="24" fill="#16203a" stroke="#ff9900" stroke-width="3"/>
+        <text x="310" y="147" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">YOU</text>
+        <text x="310" y="161" text-anchor="middle" fill="#9fb0cc" font-size="9">decide</text>
+        <!-- TEAL counter-forces — stacked bottom band -->
+        <text x="260" y="196" text-anchor="middle" fill="#8fe0b6" font-size="11.5" font-weight="700">COUNTER-FORCES  ←  pull back toward learning</text>
+        <text x="260" y="212" text-anchor="middle" fill="#8fe0b6" font-size="11">reps / practice  ·  psychological safety  ·  curiosity</text>
+        <!-- lead-lens payoff footer -->
+        <rect x="8" y="232" width="504" height="42" rx="6" fill="#16203a" stroke="#ff9900" stroke-width="1"/>
+        <text x="260" y="250" text-anchor="middle" fill="#fff" font-size="11">For a LEAD, these pulls are DIALS — some to set, some to buffer &amp; escalate.</text>
+        <text x="260" y="265" text-anchor="middle" fill="#9fb0cc" font-size="11">You OWN: safety-to-ask, what you reward. You BUFFER: deadline, spec clarity set above you.</text>
+      </svg>
+      <div class="note">The choice is a <b>net force</b>, not a free pick — four pressures out-pull the counter-forces. Pattern A and B on slide 3 didn't happen in a vacuum either.</div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Four forces that push toward the easy way out</h3>
+      <ul class="clean">
+        <li><b>Tight deadlines.</b> With no time to derive, paste-and-move feels rational — speed is on the schedule; understanding isn't.</li>
+        <li><b>Ambiguity.</b> An unclear task makes understanding feel expensive and open-ended, so you grab whatever produces output — yet ambiguity is exactly where understanding matters most (Part II's negative space).</li>
+        <li><b>Communication &amp; cultural norms.</b> Where it doesn't feel safe to say "I don't understand" or to question a senior, the gap gets <i>hidden</i> behind model output instead of surfaced.</li>
+        <li><b>Motivation.</b> Drive to <i>understand</i> chooses the hard path; drive to <i>close the ticket</i> chooses the shortcut. Both ship — only one learns.</li>
+      </ul></div>
+      ${ai("Reward-design analogy: if the reward signal is throughput and latency only, the optimizer finds the shortcut — you get what you measure. Deadline pressure plus ambiguity is a reward function that pays for the appearance of progress, so the shortcut becomes the rational policy. The fix is not to exhort harder; it is to reshape the signal — value the derivation, reduce the ambiguity, and make being confused safe to say out loud.")}
+    </div>
+  </div>
+  ${lens("Name the force before you reach for the shortcut, and say it out loud: \"the spec is ambiguous here — do we mean X or Y?\" beats silently pasting a guess. Named, it becomes a choice — and a better spec — instead of a hidden gap.", "Split the dials honestly: you OWN psychological safety, what you reward, and the earn-vs-delegate line; you only INFLUENCE deadline and spec quality (set above you) — so buffer and escalate them. Own what's yours and the atrophy isn't only the junior's fault.")}
+  ${foot('05 · Why the shortcut wins')}
+</div>`);
+
+/* ---- 6. EARN BY HAND vs DELEGATE ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The line</div>
+  <h2 class="title">What to build by hand — <span class="hl">and what to delegate</span></h2>
+  <div class="sub">Using the model is not the problem; using it on the <i>wrong</i> things is. Some work is muscle you must grow; some is toil you should shed.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card" style="border-color:#39d98a"><h3 style="color:#8fe0b6">Earn by hand — non-negotiable</h3>
+      <ul class="clean">
+        <li><b>How the DUT interface behaves</b> — the handshake, the ordering, what a corner case means. (Slide 3, Pattern A, was exactly this gap.)</li>
+        <li><b>Why a check proves what it claims</b> — trace one checker to its spec clause, yourself, at least once.</li>
+        <li><b>Reading a waveform cold</b> — cause to effect, with no tool narrating it.</li>
+        <li><b>A failure's root cause</b> — the reasoning chain, not just the edit that turned red green.</li>
+      </ul></div>
+      <div class="ex"><span class="xt">Concrete</span> The model scaffolds a stimulus <b>sequence class</b> in seconds — <b>delegate ✓</b>. Whether that sequence actually drives the handshake the DUT expects, in the order it expects — <b>you must know that cold</b>. Scaffolding is typing; the protocol is understanding.</div>
+    </div>
+    <div class="col">
+      <div class="card" style="border-color:#7aa2ff"><h3 style="color:#a9c2ff">Safe to delegate — once you understand it</h3>
+      <ul class="clean">
+        <li><b>Boilerplate &amp; scaffolding</b> — class skeletons, repetitive registration, format-conversion glue.</li>
+        <li><b>Syntax recall &amp; API lookups</b> — the faster manual.</li>
+        <li><b>First drafts you will then interrogate</b> — a starting point you rewrite, not a finished answer you paste.</li>
+        <li><b>Explaining unfamiliar code back to you</b> — as a tutor, provided you verify it.</li>
+      </ul></div>
+      <div class="note"><b>The test:</b> "If I delegate this, do I still understand the result well enough to defend it — and to catch the model if it's wrong?" If no, it stays on the left until you do.</div>
+    </div>
+  </div>
+  ${lens("Delegate the <b>typing</b>, never the <b>thinking</b>. The line moves as you grow — work graduates from left to right once you can defend it unaided.", "Set this line <b>explicitly</b> for juniors — left-column work is where judgment forms; delegate it to save days and you trade a permanent capability gap for a temporary schedule win. <b>Caveat:</b> this assumes an engineer you're investing in — for short-tenure or non-growth-track staff, optimize throughput deliberately; just don't put a growth-track junior on the throughput track by accident.")}
+  ${foot('06 · Earn vs delegate')}
+</div>`);
+
+/* ---- 7. DESIRABLE DIFFICULTY ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Why the struggle matters</div>
+  <h2 class="title">The friction <span class="hl">is</span> the learning</h2>
+  <div class="sub">A robust finding in the learning sciences: conditions that make acquisition feel <i>slower and harder</i> often produce <i>deeper, more durable</i> learning. Effortless answers feel productive and teach almost nothing.</div>
+  <div class="body">
+    <div class="col">
+      <svg class="dg" viewBox="0 0 520 290" preserveAspectRatio="xMidYMid meet">
+        <line x1="60" y1="245" x2="480" y2="245" stroke="#2b3a5e" stroke-width="1.5"/>
+        <line x1="60" y1="245" x2="60" y2="30" stroke="#2b3a5e" stroke-width="1.5"/>
+        <text x="270" y="277" text-anchor="middle" class="lbls">effort you spend now →</text>
+        <text x="30" y="140" text-anchor="middle" class="lbls" transform="rotate(-90 30 140)">judgment that sticks →</text>
+        <path d="M60 245 C 120 150, 220 150, 470 148" fill="none" stroke="#ff6b6b" stroke-width="2.4" stroke-dasharray="5 4"/>
+        <text x="360" y="138" fill="#ff9a9a" class="lbls">paste-the-answer: feels fast, stays shallow</text>
+        <path d="M60 245 C 180 236, 300 120, 470 52" fill="none" stroke="#39d98a" stroke-width="2.6"/>
+        <text x="300" y="66" fill="#8fe0b6" class="lbls">struggle-then-verify: slower, compounds</text>
+        <circle cx="470" cy="52" r="5" fill="#39d98a"/>
+        <circle cx="470" cy="148" r="5" fill="#ff6b6b"/>
+      </svg>
+      <div class="cite">Concept: <b>desirable difficulties</b> (retrieval practice, spacing, generation effect) — R. A. Bjork &amp; colleagues; and <b>deliberate practice</b> — K. A. Ericsson. <i>Attributions to be verified against the primary sources before publication.</i></div>
+    </div>
+    <div class="col">
+      <div class="ex"><span class="xt">Concrete</span> You predict a short read burst streams back <b>one beat per cycle</b>. You run it and watch <b>READY drop mid-burst</b> — the transfer stretches out, beat by beat, as the consumer backpressures. That miss just taught you flow control is <b>per-beat (valid/ready), not per-transaction</b> — and it's far stickier than a fact you were handed, because being wrong first is what makes it retrievable later. A passing test from the model would have hidden the whole handshake.</div>
+      <div class="card" style="margin-top:9px"><h3>Turn it into habit</h3>
+      <ul class="clean">
+        <li><b>Predict before you peek</b> — state what the waveform will show, then look. The gap is the lesson.</li>
+        <li><b>Derive, then check</b> — reason out why a check should hold before asking the model.</li>
+        <li><b>Retrieve, don't re-read</b> — explain yesterday's bug from memory before opening the log.</li>
+        <li><b>Sit in confusion a little longer</b> — the model ends it instantly; that convenience is what removes the learning.</li>
+      </ul></div>
+      ${ai("You know this shape from training: the smoothest path to low loss is not the one that generalizes. Handing a learner the answer removes the productive error — the hard negative they would have made and corrected. Optimize a student for frictionless correctness and you get the human analog of overfitting: fluent on seen problems, lost on the tail.")}
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> If it felt easy, you probably didn't learn it. <b>Choose the harder path on purpose</b> for the things you must own — the discomfort is the signal that judgment is forming.</div>
+  ${foot('07 · Desirable difficulty')}
+</div>`);
+
+/* ---- 8. SPARRING PARTNER, NOT ORACLE ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">How to use the model</div>
+  <h2 class="title">A sparring partner, <span class="hl">not an oracle</span></h2>
+  <div class="sub">Same tool, opposite learning outcomes — decided by how you prompt and what you do with the reply.</div>
+  <div class="body">
+    <div class="col">
+      <svg class="dg" viewBox="0 0 520 300" preserveAspectRatio="xMidYMid meet">
+        ${DEFS}
+        <text x="130" y="28" text-anchor="middle" fill="#ff9a9a" font-weight="800" font-size="13">ORACLE (atrophy)</text>
+        <rect x="60" y="48" width="140" height="46" rx="9" class="box"/><text x="130" y="76" text-anchor="middle" class="lbl">you: "give me the answer"</text>
+        <path d="M130 94 L130 128" class="flowR"/>
+        <rect x="60" y="130" width="140" height="46" rx="9" fill="#25121a" stroke="#ff6b6b"/><text x="130" y="152" text-anchor="middle" fill="#ff9a9a" class="lbls">model: answer</text><text x="130" y="168" text-anchor="middle" fill="#ff9a9a" class="lbls">you: paste</text>
+        <text x="130" y="206" text-anchor="middle" class="lbls">one-way · nothing forms</text>
+        <text x="390" y="28" text-anchor="middle" fill="#8fe0b6" font-weight="800" font-size="13">SPARRING (growth)</text>
+        <rect x="320" y="48" width="140" height="46" rx="9" class="box"/><text x="390" y="70" text-anchor="middle" class="lbl">you: propose + reason</text><text x="390" y="86" text-anchor="middle" class="lbls">"here's my take — poke holes"</text>
+        <path d="M390 94 L390 128" class="flow2"/>
+        <rect x="320" y="130" width="140" height="46" rx="9" fill="#0f2018" stroke="#39d98a"/><text x="390" y="152" text-anchor="middle" fill="#8fe0b6" class="lbls">model: challenges,</text><text x="390" y="168" text-anchor="middle" fill="#8fe0b6" class="lbls">counter-examples</text>
+        <path d="M320 153 C 250 198, 320 208, 388 180" class="flow2"/>
+        <text x="300" y="226" text-anchor="middle" class="lbls">loop · judgment compounds</text>
+      </svg>
+      <div class="ex"><span class="xt">Concrete</span> A model reads a failure log and <b>confidently blames the design</b>. You trace it yourself: the scoreboard matched the response to a <b>stale outstanding ID after an out-of-order return</b>, so it compared against the <b>wrong transaction</b> — the design was fine. Fluent, and wrong. If you had accepted its verdict, you'd have filed a bug on innocent RTL. You caught it because you re-derived, not because you trusted.</div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Prompts that make it spar</h3>
+      <ul class="clean">
+        <li><b>"Don't give the answer — ask me questions until I derive it."</b></li>
+        <li><b>"Here's my reasoning. Find the flaw."</b> — then defend or update.</li>
+        <li><b>"What corner case does my checker miss?"</b> — red-team your own work.</li>
+        <li><b>"Explain it two ways and tell me which is wrong and why."</b></li>
+        <li><b>"Quiz me on the interface I just wrote a test for."</b> — the slide-3 probe, self-served.</li>
+      </ul></div>
+      ${ai("A model is a superb generator of counter-examples and alternative framings — genuinely useful. The skill is CALIBRATED trust, not blanket suspicion: trust it where you can cheaply verify (boilerplate, syntax, a scaffold you'll read anyway), doubt it where being wrong is expensive (ambiguous corner-case reasoning, an RCA verdict). The failure mode is treating it as a terminal oracle — accept-and-move-on — on exactly the high-cost calls. Part II's provenance rule applies to your own learning: trust a conclusion because YOU can trace it, not because the model asserted it with confidence.")}
+    </div>
+  </div>
+  ${lens("Ask the model to <b>interrogate you</b>, not to spare you the thinking. If your prompt ends the thinking, it ended the learning.", "Coach the prompt style, not just the output. A junior who only ever asks the model for answers is training their own dependence — review <b>how</b> they use it, not only what they ship.")}
+  ${foot('08 · Sparring partner')}
+</div>`);
+
+/* ---- 9. THE ADVERSARIAL INSTINCT ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The core DV muscle</div>
+  <h2 class="title">Turn the senior's probe <span class="hl">on yourself</span></h2>
+  <div class="sub">On slide 3 a senior asked "how does this actually work?" and the surface cracked. The craft of DV is learning to run that probe on your <i>own</i> work — before anyone else does, and before silicon does.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card"><h3>The skeptic's checklist — on your own output</h3>
+      <ul class="clean">
+        <li><b>What does this actually prove?</b> Name the spec behavior. If you can't, it may be verification theater.</li>
+        <li><b>When would this pass while the design is broken?</b> Hunt the vacuous pass.</li>
+        <li><b>What's in the negative space?</b> Reset mid-transfer, a full queue, an interrupt at the wrong instant — the events the spec never named.</li>
+        <li><b>Is my oracle <span class="def">(the independent source of what the answer SHOULD be — derived from spec, not from the design)</span> independent?</b> Or did I quietly shape it to match what the design already does? (Part II's circularity, at your desk.)</li>
+        <li><b>Did I bind the check to the right transaction?</b> (Slide 8 — that exact miss.)</li>
+      </ul></div>
+    </div>
+    <div class="col">
+      <div class="ex"><span class="xt">Concrete</span> Your assertion has <b>passed every single run</b> for weeks — reassuring. You put a <b>cover on its precondition</b> and find it fired only <b>0.1%</b> of the time. The green was <b>near-meaningless coverage, not proof</b> — the check was <i>barely exercised</i>, so it never had the chance to fail. <span class="def">(Strictly: it was <i>vacuously</i> true on the 99.9% of cycles the antecedent never fired — a real pass only on the rare 0.1%.)</span> Gut-doubt found it early; an <b>antecedent-coverage</b> check would have caught it mechanically — the instinct and the metric are complements, not substitutes.</div>
+      <svg class="dg" viewBox="0 0 520 220" preserveAspectRatio="xMidYMid meet">
+        ${DEFS}
+        <rect x="180" y="86" width="160" height="56" rx="12" fill="#16203a" stroke="#2bd4c4" stroke-width="2"/>
+        <text x="260" y="110" text-anchor="middle" fill="#2bd4c4" font-weight="800" font-size="13">YOUR work</text>
+        <text x="260" y="128" text-anchor="middle" class="lbls">test · checker · conclusion</text>
+        <path d="M340 98 C 440 62, 440 168, 342 132" class="flowO"/>
+        <text x="454" y="115" text-anchor="middle" fill="#ffcc66" class="lbls" transform="rotate(90 454 115)">"why is this true?"</text>
+        <text x="260" y="40" text-anchor="middle" fill="#ffcc66" font-weight="700" class="lbls">the probe you run BEFORE sign-off</text>
+        <text x="260" y="190" text-anchor="middle" class="lbls">every green must survive your own doubt first</text>
+      </svg>
+    </div>
+  </div>
+  ${lens("Be professionally suspicious of your own green results. <b>Assume your check is lying until you've shown why it can't be</b> — that reflex is the job.", "This reflex is what makes an IC self-directing (the fix to Pattern B). Grow it deliberately: ask juniors to <b>attack their own passing tests</b> in review, not just present them.")}
+  ${foot('09 · The adversarial instinct')}
+</div>`);
+
+/* ---- 10. A PRACTICE REGIMEN ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Make it a habit</div>
+  <h2 class="title">A practice regimen for <span class="hl">the first years</span></h2>
+  <div class="sub">Intuition is not granted by seniority; it accumulates from reps done a particular way. These are cheap, daily, compounding — and none of them forbid the model, they just refuse to let it think for you.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card"><h3>Daily reps <span class="def" style="font-weight:400">— one is non-negotiable, the rest rotate</span></h3>
+      <ul class="clean">
+        <li><b>Predict-then-verify <span style="color:#39d98a">(the keystone — do this one even in crunch)</span>.</b> Write your expectation before you run. It's free — it rides on work already running — and logging the misses is your curriculum.</li>
+        <li><b>Explain-first.</b> Before writing a line, state the problem, the interface, and the expected behavior. The direct fix to Pattern A.</li>
+        <li><b>One derivation a day.</b> Trace one check or behavior back to the spec, end to end, alone.</li>
+        <li><b>Teach-back.</b> Explain today's mechanism to a peer or a rubber duck. Gaps surface the instant you have to say it.</li>
+      </ul></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Weekly reps</h3>
+      <ul class="clean">
+        <li><b>Bug journal.</b> Every failure: root cause, the reasoning that found it, what would have caught it earlier. Re-read monthly.</li>
+        <li><b>Red-team a passing test.</b> Pick one green result and try to prove it vacuous. Sometimes it is — that's the win (slide 9).</li>
+        <li><b>Read something you didn't write</b> — a senior's checker, a protocol section — and reconstruct <i>why</i> it's built that way.</li>
+        <li><b>Model post-mortem.</b> Take one thing the model gave you on a <i>judgment</i> call and find where it was subtly wrong. On ambiguous reasoning it eventually is; finding it is the exercise.</li>
+      </ul></div>
+      <div class="note"><b>Use the model to accelerate the reps, not skip them:</b> let it quiz you, generate variations to predict, or challenge your derivation — the loop from slide 8.</div>
+    </div>
+  </div>
+  <div class="plain"><span class="lvl">In plain terms</span> You don't rise to deep intuition; you fall to the level of your daily habits. <b>Small reps that force you to reason — every day — beat occasional heroics</b>, and they leave the model in your workflow.</div>
+  ${foot('10 · A practice regimen')}
+</div>`);
+
+/* ---- 11. ATROPHY vs GROWTH (dual audience) ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Am I / is my team actually learning?</div>
+  <h2 class="title">Deepening — or quietly <span class="hl">atrophying</span>?</h2>
+  <div class="sub">Both paths ship work, so output alone won't tell you which one you're on. Here are the honest tells — for the IC checking themselves, and the lead watching the team.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card" style="border-color:#39d98a"><h3 style="color:#8fe0b6">Signs of deepening</h3>
+      <ul class="clean">
+        <li>Can <b>explain the work</b> with the model out of the room.</li>
+        <li>Increasingly <b>predicts</b> what a result will show — and is right more often.</li>
+        <li>Catches the model being <b>confidently wrong</b>, and says why (slide 8).</li>
+        <li>Asks <b>sharper questions</b> over time, not the same ones.</li>
+        <li>Feels the <b>"that smells wrong"</b> reflex before fully justifying it.</li>
+      </ul></div>
+    </div>
+    <div class="col">
+      <div class="card" style="border-color:#ff6b6b"><h3 style="color:#ff9a9a">Signs of atrophy</h3>
+      <ul class="clean">
+        <li><b>Can't explain</b> code "written" last week.</li>
+        <li>Accepts model output <b>without a check</b> — "it's usually fine."</li>
+        <li>Red results <b>stall them</b> — they paste the error and wait, rather than reason.</li>
+        <li>Questions <b>aren't getting deeper</b> — same ones as months ago.</li>
+        <li><b>Faster but not more capable</b>, and <b>needs a push per task</b> — the Pattern-B tell.</li>
+      </ul></div>
+      ${ai("This is automation complacency / over-reliance, documented before LLMs in aviation and other automated systems: when an aid is usually right, human monitoring and skill degrade, and operators miss the rare case the aid gets wrong. The lesson was never 'don't automate' — it's 'keep the human actively in the loop, or the human decays.' For a learner the aid is right often enough to be seductive and wrong often enough to be dangerous.")}
+      <div class="cite">Concept: <b>automation complacency / over-reliance</b> — Parasuraman &amp; Riley, and related human-factors work. <i>Attribution to be verified against primary sources before publication.</i></div>
+    </div>
+  </div>
+  ${lens("Speed is not the metric. <b>Can-you-explain-it-and-catch-it-when-it's-wrong is.</b> Check yourself against the right column, honestly, often.", "Watch the questions, not the throughput. A junior who ships fast but <b>needs a push per task and can't defend the work</b> is atrophying on your watch — intervene early, it compounds. And the same <b>catch-the-model-when-wrong</b> probe is your <b>interview and promotion</b> signal, not just your review one — level on demonstrated judgment, because the portfolio no longer proves it.")}
+  ${foot('11 · Deepening vs atrophy')}
+</div>`);
+
+/* ---- 12. THE SOLUTION ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The honest question</div>
+  <h2 class="title">So what's the solution? <span class="hl">Verify it like you verify a chip</span></h2>
+  <div class="sub">Missing or ambiguous docs are real, and the model genuinely helps a junior through them — used <i>wisely</i>. But the industry has <b>no standard</b> for "wisely," <b>banning</b> the model wastes its value, and <b>interrogating every task</b> or policing every review <b>does not scale</b>. So stop trying to inspect understanding exhaustively — for the exact reason Part II gives that you can't exhaustively test a chip. Apply the DV playbook to the people problem.</div>
+  <div class="body">
+    <div class="col">
+      <svg class="dg" viewBox="0 0 520 300" preserveAspectRatio="xMidYMid meet">
+        ${DEFS}
+        <text x="260" y="22" text-anchor="middle" class="kbig" fill="#cfdaee">Two dead ends → one reframe</text>
+        <!-- dead ends -->
+        <rect x="40" y="44" width="200" height="46" rx="10" fill="#25121a" stroke="#ff6b6b"/>
+        <text x="140" y="66" text-anchor="middle" fill="#ff9a9a" class="lbls">ban the model</text>
+        <text x="140" y="82" text-anchor="middle" fill="#ff9a9a" class="lbls">→ waste its real value ✗</text>
+        <rect x="40" y="100" width="200" height="46" rx="10" fill="#25121a" stroke="#ff6b6b"/>
+        <text x="140" y="122" text-anchor="middle" fill="#ff9a9a" class="lbls">quiz every task / police reviews</text>
+        <text x="140" y="138" text-anchor="middle" fill="#ff9a9a" class="lbls">→ doesn't scale ✗</text>
+        <!-- reframe -->
+        <path d="M240 118 L292 150" class="flowO"/>
+        <rect x="292" y="120" width="196" height="60" rx="12" fill="#0f2018" stroke="#39d98a" stroke-width="2"/>
+        <text x="390" y="145" text-anchor="middle" fill="#39d98a" font-weight="800" font-size="12.5">It's a verification problem</text>
+        <text x="390" y="164" text-anchor="middle" class="lbls">can't inspect it all → sample + evidence</text>
+        <!-- the moves fanning out -->
+        ${[['reasoning artifact',40],['sample at sign-off',150],['adversarial reps',260],['escalate spec gaps',370]].map(([t,x])=>`<path d="M390 180 L${x+35} 238" class="flow2"/><rect x="${x-25}" y="240" width="120" height="42" rx="8" fill="#101c36" stroke="#2bd4c4"/><text x="${x+35}" y="265" text-anchor="middle" fill="#bfeee7" class="lbls">${t}</text>`).join('')}
+      </svg>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Engineer the environment, don't police it</h3>
+      <ul class="clean">
+        <li><b>Attach the reasoning to the work</b> — a one-paragraph "why this is correct" in the PR, on high-signal items only (new checker, RCA, sign-off). Writing it <i>is</i> the rep; and since it's ghost-writable, it must survive a <b>live, un-pre-announced follow-up</b>.</li>
+        <li><b>Sample, don't exhaust</b> — probe at review, RCA, sign-off; vary and time the probe so people prepare to <i>understand</i>, not to perform. <span class="def">= coverage-directed, not exhaustive.</span></li>
+        <li><b>Test by reps, not vivas</b> — have them attack their own passing tests. Whether they <i>catch the model when it's wrong</i> carries the weight; a self-authored artifact is only a conformance signal.</li>
+        <li><b>Turn ambiguity into an escalatable list</b> — DV rarely rewrites the spec, but "here are the gaps it's silent on" is your leverage: getting it fixed is a negotiation; documenting it isn't optional.</li>
+        <li><b>Shape the tool, not just the person</b> — require the assistant to <i>spar</i>, to <i>surface spec-silence</i> instead of guessing, and to <i>show evidence + a competing hypothesis</i>, not a bare verdict. <span class="def">(Makes the probe cheaper — can't verify understanding <i>for</i> you.)</span></li>
+        <li><b>Write the team's own norm</b> (none exists industry-wide): earn-by-hand list non-delegable during ramp · AI work ships a defensible "why" · provenance = verified vs. asserted · "I don't understand yet" is praised. <b>A norm only holds if you keep it in crunch.</b></li>
+      </ul></div>
+      ${ai("Coverage-directed verification applied to growth. But mind the recursion the deck's own thesis implies: a reasoning artifact is as gameable as the code — an LLM will produce a convincing derivation on command — so reward whether it SURVIVES an unannounced probe, not that it exists.")}
+    </div>
+  </div>
+  ${lens("You don't need an industry standard to start: <b>attach your reasoning to your work</b>, and use \"can I catch the model when it's wrong?\" as your own pass/fail.", "Rank by cost/impact — <b>if you do only one thing, make \"I don't understand\" safe and probe at sign-off.</b> Engineering the environment is cheaper than policing every task, and unlike a schedule win, it compounds.")}
+  ${foot('12 · The solution')}
+</div>`);
+
+/* ---- 13. CLOSE ---- */
+slides.push(`
+<div class="slide cover">
+  <div class="kicker">The through-line</div>
+  <h2 class="title" style="font-size:38px">The model can hand you the answer. <span class="hl">It cannot hand you the judgment.</span></h2>
+  <div class="quote" style="margin-top:14px;font-size:22px">
+    Judgment is <span class="hl">rehearsed, not inherited</span> — earned by hand where it must be, accelerated by the model everywhere else. Spar, don't outsource; be suspicious of your own green; do the reps that force you to reason. That is how a newcomer becomes — and how a lead grows — the <span class="hl">independent proof</span> Part II said verification now depends on.
+  </div>
+  <div class="epi" style="margin-top:16px">
+    <p>"From a drop of water a logician could infer the possibility of an Atlantic or a Niagara without having seen or heard of one or the other… let the inquirer begin by mastering more elementary problems."</p>
+    <span class="att">— Arthur Conan Doyle, Sherlock Holmes · the "drop of water" is trained inference, built by first mastering the elementary — the reps, not a gift you wait for.</span>
+  </div>
+  <div class="badgerow" style="margin-top:20px">
+    <div class="badge"><b>An artifact you produce ≠ a system you understand</b></div>
+    <div class="badge"><b>Delegate the typing, never the thinking</b></div>
+    <div class="badge"><b>Spar with the model; don't outsource to it</b></div>
+    <div class="badge"><b>Capability without self-direction doesn't scale</b></div>
+  </div>
+  <div class="sub" style="margin-top:18px">The LLM era does not lower the bar for DV judgment — it raises it: the volume of plausible-looking work goes up, so the scarce skill becomes the person who can tell whether any of it is actually correct. <b>ICs get there the old way, just faster — reason first, verify always, let the model sharpen the reps. Leads get a team there by protecting the reps, shaping the forces, and reviewing how people think, not only what they ship.</b></div>
+  ${foot('13 · Close')}
+</div>`);
+
+/* ============================ ENGINE ============================ */
+const deck = document.getElementById('deck');
+deck.innerHTML = slides.join('');
+const S = [...document.querySelectorAll('.slide')];
+let i = 0;
+function show(n){
+  i = Math.max(0, Math.min(S.length-1, n));
+  S.forEach((s,k)=>s.classList.toggle('active', k===i));
+  document.getElementById('prog').style.width = ((i)/(S.length-1)*100)+'%';
+  document.getElementById('num').textContent = (i+1)+' / '+S.length;
+  location.hash = i+1;
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' ') {show(i+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'||e.key==='PageUp'){show(i-1);e.preventDefault();}
+  else if(e.key==='Home'){show(0);}
+  else if(e.key==='End'){show(S.length-1);}
+  else if(e.key.toLowerCase()==='f'){if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen();}
+  else if(e.key.toLowerCase()==='p'){window.print();}
+  else if(e.key.toLowerCase()==='o'){document.body.classList.toggle('ov');}
+});
+deck.addEventListener('click',e=>{ if(e.clientX > window.innerWidth*0.62) show(i+1); else if(e.clientX < window.innerWidth*0.18) show(i-1); });
+const start = parseInt(location.hash.replace('#',''))||1; show(start-1);
+</script>
+</body>
+</html>
