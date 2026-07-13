@@ -91,6 +91,8 @@
   .disc{position:fixed;top:10px;right:16px;font-size:10.5px;color:#3d4c6b}
   .contact{color:var(--muted);font-size:14.5px;margin-top:20px}
   .contact b{color:#cfe}
+  .xlink{margin-top:10px;font-size:13.5px}
+  .xlink a{color:var(--accent2);text-decoration:none;border-bottom:1px dotted var(--accent2)}
   .toc{display:flex;flex-direction:column;gap:9px;margin-top:6px}
   .agrow{display:flex;align-items:center;gap:16px;background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:12px;padding:11px 18px;cursor:pointer;transition:border-color .15s ease,transform .15s ease}
   .agrow:hover{border-color:var(--accent);transform:translateX(5px)}
@@ -148,7 +150,8 @@ slides.push(`
     <div class="badge"><b>Running example:</b> a DMA data-movement subsystem</div>
     <div class="badge"><b>Goal:</b> DV know-how → AI-assisted chip design</div>
   </div>
-  <div class="contact"><b>Shrikant Sundaram</b> · sskant@amazon.com</div>
+  <div class="contact"><b>Shrikant Sundaram</b></div>
+  <div class="xlink"><a href="part2.html">Continue to Part II: The Limits of Translation →</a> — why DV persists in the era of AI-generated RTL.</div>
   ${foot('01 · Title')}
 </div>`);
 
@@ -186,6 +189,7 @@ slides.push(`
         <div class="metric"><div class="big">$Ms</div><div class="cap">cost of a mask respin from one escaped bug</div></div>
         <div class="metric"><div class="big">10⁹+</div><div class="cap">state combinations a modern block can reach</div></div>
       </div>
+      <div class="src" style="margin-top:6px;font-size:11px;color:#5b6d90">Effort share: industry surveys — <b style="color:#8fa3c6">Wilson Research Group Functional Verification Study</b> (commissioned by Siemens EDA, Harry Foster). Ranges are industry-typical; actuals must be measured per program.</div>
       <div class="card" style="margin-top:14px">
         <h3>The core problem</h3>
         <ul class="clean">
@@ -443,7 +447,7 @@ slides.push(`
         <text x="280" y="176" text-anchor="middle" fill="#ff9900" font-weight="800" font-size="13">MY sign-off</text>
         <text x="280" y="195" text-anchor="middle" class="lbls">(DUT verification)</text>
         <rect x="20" y="60" width="200" height="56" rx="9" fill="#123" stroke="#7aa2ff"/><text x="120" y="82" text-anchor="middle" fill="#7aa2ff" font-weight="700" class="lbl">Golden model</text><text x="120" y="100" text-anchor="middle" class="lbls">another team · bug → false mismatch</text>
-        <rect x="340" y="60" width="200" height="56" rx="9" fill="#123" stroke="#2bd4c4"/><text x="440" y="82" text-anchor="middle" fill="#2bd4c4" font-weight="700" class="lbl">Firmware / HAL</text><text x="440" y="100" text-anchor="middle" class="lbls">shared w/ product SW · bug ships</text>
+        <rect x="340" y="60" width="200" height="56" rx="9" fill="#123" stroke="#2bd4c4"/><text x="440" y="82" text-anchor="middle" fill="#2bd4c4" font-weight="700" class="lbl">Firmware / driver</text><text x="440" y="100" text-anchor="middle" class="lbls">shared w/ product SW · bug ships</text>
         <rect x="340" y="248" width="200" height="56" rx="9" fill="#123" stroke="#c99bff"/><text x="440" y="270" text-anchor="middle" fill="#c99bff" font-weight="700" class="lbl">Third-party VIP</text><text x="440" y="288" text-anchor="middle" class="lbls">vendor, closed · bug → their turnaround</text>
         <rect x="20" y="248" width="200" height="56" rx="9" fill="#0f2018" stroke="#39d98a"/><text x="120" y="270" text-anchor="middle" fill="#39d98a" font-weight="700" class="lbl">The testbench</text><text x="120" y="288" text-anchor="middle" class="lbls">mine · bug → my problem</text>
         <text x="280" y="345" text-anchor="middle" class="lbls">dashed ring = "I depend on it but do NOT own it"</text>
@@ -453,11 +457,11 @@ slides.push(`
       <div class="card"><h3>Three ways to go red without a design bug</h3>
       <ul class="clean">
         <li><b>Reference (golden) model</b> — independent, spec-derived, often <b>another team's</b>. A model bug flags a mismatch though the design is fine: the red is real, the blame is misplaced.</li>
-        <li><b>Firmware/driver layer</b> — a <b>HAL</b> <span class="def">(hardware abstraction layer: the software that programs the device's registers, often shared with the production software stack)</span>. A HAL bug is a verification blocker <i>and</i> a customer-facing defect.</li>
+        <li><b>Firmware/driver layer</b> — the <b>firmware/driver layer</b> <span class="def">(the software that programs the device's registers, often shared with the production software stack)</span>. A firmware bug is a verification blocker <i>and</i> a customer-facing defect.</li>
         <li><b>Third-party VIP</b> <span class="def">(Verification IP: a vendor's model of a standard protocol; you configure it, you do not own its source)</span> — a VIP bug carries a <b>vendor turnaround</b>, days to weeks, that you cannot compress.</li>
       </ul></div>
       <div class="card" style="margin-top:10px"><h3>The honest consequence</h3><p class="small">On a mature testbench, most "failures" are <b>not</b> design bugs. The engineer's first job on a red is <b>attribution</b> — which of N differently-owned components is at fault — before anyone touches the design.</p></div>
-      ${ai('Attribution/triage is a gradeable classification task: from a failure signature + logs + config, predict the at-fault component (design / golden / HAL / VIP / testbench) and localize it. Note the grader here is <b>historical human owner-labels</b>, NOT the deterministic simulator verdict used elsewhere — a weaker, <b>noisy/biased</b> reward (final owner after re-routing; bounced wrong-owner tickets mislabeled) — so evaluation must account for it. Fails today: models over-attribute to the most-visible component and skip proving the comparison was bound to the correct transaction.')}
+      ${ai('Attribution/triage is a gradeable classification task: from a failure signature + logs + config, predict the at-fault component (design / golden / firmware / VIP / testbench) and localize it. Note the grader here is <b>historical human owner-labels</b>, NOT the deterministic simulator verdict used elsewhere — a weaker, <b>noisy/biased</b> reward (final owner after re-routing; bounced wrong-owner tickets mislabeled) — so evaluation must account for it. Fails today: models over-attribute to the most-visible component and skip proving the comparison was bound to the correct transaction.')}
     </div>
   </div>
   ${foot('10 · Dependencies you rely on')}
@@ -474,7 +478,7 @@ slides.push(`
       <text x="40" y="40" class="lbl" fill="#2bd4c4" font-weight="700">ROUTE</text>
       <rect x="40" y="55" width="150" height="52" rx="9" fill="#25121a" stroke="#ff6b6b"/><text x="115" y="86" text-anchor="middle" fill="#ff6b6b" class="lbl">red failure</text>
       <path d="M190 81 L228 81" class="flow"/>
-      <rect x="228" y="55" width="180" height="52" rx="9" class="box"/><text x="318" y="78" text-anchor="middle" class="lbl">Attribution</text><text x="318" y="96" text-anchor="middle" class="lbls">which of {design,golden,HAL,VIP,TB}?</text>
+      <rect x="228" y="55" width="180" height="52" rx="9" class="box"/><text x="318" y="78" text-anchor="middle" class="lbl">Attribution</text><text x="318" y="96" text-anchor="middle" class="lbls">which of {design,golden,firmware,VIP,TB}?</text>
       <path d="M408 81 L446 81" class="flow"/>
       <rect x="446" y="48" width="190" height="66" rx="9" fill="#101c36" stroke="#ffcc66"/><text x="541" y="72" text-anchor="middle" fill="#ffcc66" class="lbl">Provenance gate</text><text x="541" y="90" text-anchor="middle" class="lbls">bound to the correct txn?</text><text x="541" y="105" text-anchor="middle" class="lbls" fill="#ff6b6b">NO → loop: it is a mis-bind</text>
       <path d="M636 81 L674 81" class="flow"/>
@@ -595,7 +599,7 @@ slides.push(`
     <div class="col">
       <div class="card"><h3>Four seam-only failure classes</h3>
       <ul class="clean">
-        <li><b>FC1 · Address-space / translation mismatch.</b> At block level the HAL writes descriptors straight to the addresses the block reads — into a <b>ring buffer</b> <span class="def">(a fixed circular region of memory holding the queue of descriptors the engine pulls from)</span>. At SoC level those same writes pass through <b>address translation</b> to a different address space. A TB filter that recognized descriptors by the <i>local</i> ring-buffer address range now matches nothing — it silently drops every control write, the queue stays empty, and the engine stalls with zero warnings.</li>
+        <li><b>FC1 · Address-space / translation mismatch.</b> At block level the firmware/driver writes descriptors straight to the addresses the block reads — into a <b>ring buffer</b> <span class="def">(a fixed circular region of memory holding the queue of descriptors the engine pulls from)</span>. At SoC level those same writes pass through <b>address translation</b> to a different address space. A TB filter that recognized descriptors by the <i>local</i> ring-buffer address range now matches nothing — it silently drops every control write, the queue stays empty, and the engine stalls with zero warnings.</li>
         <li><b>FC2 · Cross-block ordering.</b> Two blocks each obeying their own rules can still violate a <i>system</i> ordering requirement (a producer's completion must be <b>globally visible</b> — seen by all blocks — before a consumer starts).</li>
         <li><b>FC3 · Shared resources / contention.</b> One interconnect, one memory port, one <b>credit pool</b> <span class="def">(credits = flow-control tokens; a sender may issue only while tokens remain)</span> → deadlock, starvation, priority inversion.</li>
         <li><b>FC4 · System scenarios.</b> Boot, reset-mid-traffic, <b>clock-domain crossing</b> <span class="def">(a signal passing between two unsynchronized clocks — a notorious bug source)</span>, firmware reconfiguration.</li>

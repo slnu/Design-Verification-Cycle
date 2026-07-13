@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>The Limits of Translation — Why DV Persists in the Era of AI-Generated RTL (Part II)</title>
+<style>
+  :root{
+    --bg:#0c1222; --bg2:#111a30; --panel:#16203a; --panel2:#1d2a49;
+    --ink:#e9eef7; --muted:#9fb0cc; --line:#2b3a5e;
+    --accent:#ff9900;     /* primary accent */
+    --accent2:#2bd4c4;    /* teal */
+    --accent3:#7aa2ff;    /* blue */
+    --good:#39d98a; --warn:#ffcc66; --bad:#ff6b6b;
+    --dut:#ff9900; --tb:#2bd4c4; --ref:#7aa2ff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, #17233f 0%, var(--bg) 55%);
+    color:var(--ink); font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+  #deck{height:100vh;width:100vw;position:relative}
+  .slide{
+    position:absolute;inset:0;display:none;flex-direction:column;
+    padding:44px 64px 70px;opacity:0;transition:opacity .25s ease;
+  }
+  .slide.active{display:flex;opacity:1}
+  h1,h2,h3{margin:0;line-height:1.12}
+  .kicker{color:var(--accent);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:13px;margin-bottom:10px}
+  h2.title{font-size:35px;font-weight:800;letter-spacing:-.5px}
+  h2.title .hl{color:var(--accent)}
+  .sub{color:var(--muted);font-size:15.5px;margin-top:9px;max-width:1090px;line-height:1.5}
+  .sub b{color:#cfe}
+  .body{flex:1;display:flex;gap:26px;margin-top:16px;min-height:0}
+  .col{flex:1;min-width:0}
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:14px;padding:15px 17px}
+  .card h3{font-size:15px;color:var(--accent2);margin-bottom:7px;letter-spacing:.02em}
+  ul.clean{margin:5px 0 0;padding-left:18px}
+  ul.clean li{margin:6px 0;color:#cfdaee;font-size:14px;line-height:1.46}
+  ul.clean li b{color:#fff}
+  .ai{background:linear-gradient(180deg,#241a08,#1a1405);border:1px solid #6b4c12;border-radius:12px;padding:12px 15px;margin-top:12px}
+  .ai .tag{color:var(--accent);font-weight:800;font-size:12px;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  .ai p{margin:6px 0 0;color:#f0dcb8;font-size:13.5px;line-height:1.46}
+  .ai .bulb{width:16px;height:16px;display:inline-block}
+  .footer{position:absolute;left:64px;right:64px;bottom:24px;display:flex;justify-content:space-between;align-items:center;color:#63769a;font-size:12.5px;border-top:1px solid var(--line);padding-top:12px}
+  .footer .brand{font-weight:700;color:#8fa3c6;letter-spacing:.04em}
+  .progress{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);transition:width .25s}
+  .num{position:absolute;right:20px;bottom:22px;color:#5b6d90;font-size:12px}
+  .hint{position:absolute;left:20px;bottom:22px;color:#3d4c6b;font-size:11px}
+  svg{width:100%;height:100%;display:block}
+  .dg{width:100%;height:100%;min-height:0}
+  text{font-family:"Segoe UI",Roboto,Arial,sans-serif}
+  .lbl{fill:var(--ink);font-size:13px}
+  .lbls{fill:var(--muted);font-size:11px}
+  .box{fill:var(--panel2);stroke:var(--line);stroke-width:1.4}
+  .flow{stroke:var(--muted);stroke-width:2;fill:none;marker-end:url(#arr)}
+  .flow2{stroke:var(--accent2);stroke-width:2;fill:none;marker-end:url(#arrT)}
+  .flowO{stroke:var(--accent);stroke-width:2.4;fill:none;marker-end:url(#arrO)}
+  .flowR{stroke:var(--bad);stroke-width:2;fill:none;marker-end:url(#arrR)}
+  .kbig{fill:#fff;font-weight:700;font-size:15px}
+  .cover{align-items:flex-start;justify-content:center}
+  .cover .chip{width:104px;height:104px;margin-bottom:20px}
+  .cover h1{font-size:52px;font-weight:800;letter-spacing:-1px;max-width:1120px}
+  .cover h1 .hl{color:var(--accent)}
+  .cover .tagline{color:var(--muted);font-size:19px;margin-top:16px;max-width:960px;line-height:1.5}
+  .badgerow{margin-top:22px;display:flex;gap:12px;flex-wrap:wrap}
+  .badge{background:#16203a;border:1px solid var(--line);border-radius:10px;padding:9px 15px;font-size:13.5px;color:#cfe;}
+  .badge b{color:var(--accent)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+  .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px}
+  .note{color:var(--muted);font-size:12.6px;font-style:italic;margin-top:8px}
+  .note b{color:#cfe;font-style:normal}
+  .quote{font-size:24px;font-weight:600;line-height:1.4;max-width:1050px;color:#fff}
+  .quote .hl{color:var(--accent)}
+  .small{font-size:13.2px;color:#cfdaee;line-height:1.46}
+  .small b{color:#fff}
+  table.matrix{width:100%;border-collapse:collapse;font-size:12.8px}
+  table.matrix th,table.matrix td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.matrix th{background:#1b2743;color:var(--accent2);font-weight:700}
+  table.matrix td b{color:#fff}
+  table.matrix tr:nth-child(even) td{background:#111a30}
+  .disc{position:fixed;top:10px;right:16px;font-size:10.5px;color:#3d4c6b}
+  .contact{color:var(--muted);font-size:14px;margin-top:18px}
+  .contact b{color:#cfe}
+  .xlink{margin-top:10px;font-size:13.5px}
+  .xlink a{color:var(--accent2);text-decoration:none;border-bottom:1px dotted var(--accent2)}
+  .toc{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+  .agrow{display:flex;align-items:center;gap:16px;background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:12px;padding:10px 18px;cursor:pointer;transition:border-color .15s ease,transform .15s ease}
+  .agrow:hover{border-color:var(--accent);transform:translateX(5px)}
+  .agrow .n{flex:0 0 34px;height:34px;border-radius:9px;background:#1b2743;color:var(--accent);font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+  .agrow .t{font-size:15px;color:#fff;font-weight:700}
+  .agrow .d{font-size:12.4px;color:var(--muted);margin-top:1px}
+  .agrow .pg{margin-left:auto;color:#63769a;font-size:12px;white-space:nowrap;padding-left:14px}
+  .def{color:#9fb0cc;font-weight:400}
+  .eduband{background:#0f2320;border:1px solid var(--accent2);border-radius:12px;padding:12px 16px;margin-top:20px;max-width:1000px;color:#bfeee7;font-size:14px;line-height:1.5}
+  .eduband b{color:var(--accent2)}
+  .edutag{position:fixed;top:10px;left:16px;font-size:10.5px;color:#0c1222;background:var(--accent2);border-radius:5px;padding:2px 9px;font-weight:800;letter-spacing:.06em;z-index:5}
+  .plain{margin-top:8px;font-size:14.5px;line-height:1.4;color:#dfe9ff;background:#122038;border-left:3px solid var(--accent2);border-radius:0 8px 8px 0;padding:7px 13px;max-width:1080px}
+  .plain b{color:var(--accent2);font-weight:700}
+  .plain .lvl{color:var(--accent2);font-weight:800;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-right:8px}
+  .epi{border-left:3px solid var(--accent);padding:6px 0 6px 18px;margin:18px 0 0;max-width:1000px}
+  .epi p{margin:0;color:#e9eef7;font-size:16px;font-style:italic;line-height:1.5}
+  .epi .att{color:var(--muted);font-size:12.8px;font-style:normal;margin-top:7px;display:block}
+  @media print{
+    body{overflow:visible;background:#0c1222 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #deck{height:auto}
+    .slide{display:flex !important;opacity:1 !important;position:relative;height:100vh;page-break-after:always;inset:auto}
+    .progress,.num,.hint{display:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="disc">Educational • Generic industry example • No proprietary/program-specific content</div>
+<div class="edutag">EDUCATION ONLY</div>
+<div id="deck"></div>
+<div class="progress" id="prog"></div>
+<div class="num" id="num"></div>
+<div class="hint">← → navigate · F fullscreen · O overview · P print/PDF</div>
+
+<script>
+/* ============================ SLIDE CONTENT ============================ */
+const bulb = '<svg class="bulb" viewBox="0 0 24 24" fill="none" stroke="#ff9900" stroke-width="2"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10c1 1 1.5 2 1.5 3h5c0-1 .5-2 1.5-3A6 6 0 0 0 12 3z"/></svg>';
+/* ai() and foot() take DOUBLE-quoted args so apostrophes inside are harmless; interior quotes use curly “ ” */
+function ai(txt){return `<div class="ai"><div class="tag">${bulb} Where a model helps — and where it fails</div><p>${txt}</p></div>`;}
+function foot(t){return `<div class="footer"><span class="brand">Design Verification — Foundations · Part II</span><span>${t}</span></div>`;}
+
+const DEFS = `<defs>
+  <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9fb0cc"/></marker>
+  <marker id="arrT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2bd4c4"/></marker>
+  <marker id="arrO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff9900"/></marker>
+  <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff6b6b"/></marker>
+</defs>`;
+
+const slides = [];
+
+/* ---- 1. COVER ---- */
+slides.push(`
+<div class="slide cover">
+  <svg class="chip" viewBox="0 0 120 120">
+    <rect x="26" y="26" width="68" height="68" rx="8" fill="#16203a" stroke="#ff9900" stroke-width="2.5"/>
+    <rect x="42" y="42" width="36" height="36" rx="4" fill="#1d2a49" stroke="#2bd4c4" stroke-width="2"/>
+    <text x="60" y="64" fill="#2bd4c4" font-size="12" text-anchor="middle" font-weight="700">DUT</text>
+    ${[...Array(5)].map((_,i)=>`<line x1="${34+i*13}" y1="26" x2="${34+i*13}" y2="12" stroke="#7aa2ff" stroke-width="2"/><line x1="${34+i*13}" y1="94" x2="${34+i*13}" y2="108" stroke="#7aa2ff" stroke-width="2"/><line x1="26" y1="${34+i*13}" x2="12" y2="${34+i*13}" stroke="#7aa2ff" stroke-width="2"/><line x1="94" y1="${34+i*13}" x2="108" y2="${34+i*13}" stroke="#7aa2ff" stroke-width="2"/>`).join('')}
+    <circle cx="60" cy="60" r="52" fill="none" stroke="#ff9900" stroke-width="2" stroke-dasharray="4 5" opacity="0.7"/>
+  </svg>
+  <div class="kicker">A foundations primer · Part II</div>
+  <h1>The <span class="hl">Limits of Translation</span></h1>
+  <div class="tagline">Why design verification persists in the era of AI-generated RTL <span class="def">(Register-Transfer Level: the source-code description of the hardware)</span>. <b style="color:var(--accent2)">A perfect translator answers "did we build it right?" — only verification answers "is it correct?", so DV doesn't disappear, it moves up to become the independent proof.</b></div>
+  <div class="epi">
+    <p>"It is a capital mistake to theorize before one has data. Insensibly one begins to twist facts to suit theories, instead of theories to suit facts."</p>
+    <span class="att">— Sir Arthur Conan Doyle, Sherlock Holmes</span>
+  </div>
+  <div class="eduband"><b>Educational primer.</b> This teaches verification <i>concepts</i> — it is not a program artifact, a commitment, a proposal, or a set of numbers. It uses only public, industry-standard ideas and a generic "AI accelerator / data-movement subsystem" example, and teaches the ideas rather than describing any specific plan or product.</div>
+  <div class="badgerow">
+    <div class="badge"><b>Audience:</b> AGI / model-training engineers — fluent in software, new to hardware verification</div>
+    <div class="badge"><b>Example:</b> a custom AI accelerator with a data-movement subsystem + a control block</div>
+    <div class="badge"><b>Goal:</b> why generating correct-looking RTL does not remove the need to verify</div>
+  </div>
+  <div class="contact"><b>Shrikant Sundaram</b></div>
+  <div class="xlink"><a href="https://slnu.github.io/Design-Verification-Cycle/#1">← Part I: The Design Verification Cycle</a> — read first for the vocabulary this deck assumes.</div>
+  ${foot('01 · Title')}
+</div>`);
+
+/* ---- 2. CONTENTS ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">What we'll cover</div>
+  <h2 class="title">Contents <span class="hl">— click any section to jump</span></h2>
+  <div class="sub">Part II makes one sharper argument than Part I: automating the <i>writing</i> of a design does not remove the need to <i>verify</i> it. Six reasons, plus the framing.</div>
+  <div class="body"><div class="col">
+    <div class="toc">
+      ${[
+        ['0','Framing &amp; the bridge from Part I','Education-only scope; Part I taught the cycle — Part II asks if AI writing RTL makes it obsolete','1','3'],
+        ['1','The thesis: conformance is not correctness','100%-accurate spec→RTL only proves "we built what was asked"; correctness is robustness over the real state-space','4','5'],
+        ['2','Why sequential complexity defies translation','Most silicon is control logic, not math; state-space explosion; RTL forces choices the prose never fixed','6','8'],
+        ['3','The what-if gap (negative space)','Specs cannot enumerate every event × moment × state; DV injects resets/glitches/interrupts and audits system-wide invariants','9','10'],
+        ['4','The checker conundrum (circularity)','A model that writes both the RTL and its own checker certifies nothing; the verifier must anchor to the spec','11','12'],
+        ['5','The integration seam','A perfect block still fails at full-chip level; seam bugs; silicon cannot be patched in the field','13','13'],
+        ['6','The evolving DV engineer','From code-writer to audit architect: defining the evidence that justifies tape-out','14','14'],
+        ['7','Close: what does and does not change','One-breath summary, the Holmes close, and the takeaways','15','15']
+      ].map(([n,t,d,go,pg])=>`<div class="agrow" onclick="show(${go}-1)"><div class="n">${n}</div><div><div class="t">${t}</div><div class="d">${d}</div></div><div class="pg">slides ${go}–${pg}</div></div>`).join('')}
+    </div>
+    <div class="note">Every section carries a "Where a model helps — and where it fails" box. Part II's honest answer: a model can help write the RTL and even draft checks, but cannot <i>be</i> the independent authority verification supplies.</div>
+  </div></div>
+  ${foot('02 · Contents')}
+</div>`);
+
+/* ---- 3. BRIDGE ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The through-line · the question is old</div>
+  <h2 class="title">If AI writes the RTL, <span class="hl">is verification obsolete?</span></h2>
+  <div class="sub">The instinct to cut <b>DV</b> <span class="def">(design verification)</span> is <i>pre-AI</i> — teams have questioned it for years. Part II's answer holds even under the strongest assumption: a translator <b>100% faithful to the spec</b>.</div>
+  <div class="plain"><span class="lvl">In plain terms</span> Verification is the long pole not because the team is slow, but because it is sized to the <b>whole problem</b>, not to the spec. So the tempting cut is a trap: <b>cutting the long pole doesn't shrink the problem — it only removes the evidence that the problem was solved.</b> The saving is small and certain; the escape it risks is a full respin — and silicon can't be patched in the field.</div>
+  <div class="body">
+    <div class="col card" style="flex:0 0 44%">
+      <h3>From the field: DV is the project's long pole</h3>
+      <div class="dg"><svg viewBox="0 0 560 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <!-- x-scale: 175 start · 330 RTL-freeze · 410 tape-out · 410-452 fab gap · 452 chips back · 545 end -->
+        <!-- fab-turnaround gap (wafers in fab) -->
+        <rect x="410" y="40" width="42" height="236" fill="#0d1526" stroke="#22314f" stroke-dasharray="2 3"/>
+        <text x="431" y="158" text-anchor="middle" class="lbls" fill="#5b6d90" transform="rotate(-90 431 158)">fab turnaround</text>
+        <!-- milestones: RTL freeze (green) & tape-out (orange) -->
+        <line x1="330" y1="38" x2="330" y2="262" stroke="#39d98a" stroke-width="1.3" stroke-dasharray="3 3"/>
+        <text x="330" y="34" text-anchor="middle" class="lbls" fill="#39d98a">◆ RTL freeze</text>
+        <line x1="410" y1="38" x2="410" y2="262" stroke="#ff9900" stroke-width="1.4" stroke-dasharray="3 3"/>
+        <text x="410" y="34" text-anchor="middle" class="lbls" fill="#ff9900">▲ tape-out</text>
+        <!-- rows: k = a(arch/blue) · d(design/orange) · p(backend·PD/purple) · v(verification/teal) -->
+        ${[
+          ['Architecture / spec',175,300,'a'],
+          ['Arch validation (perf/C-model)',175,300,'v'],
+          ['RTL design',210,330,'d'],
+          ['Backend: PD / P&R / STA',322,408,'p'],
+          ['DFT + physical signoff (DRC/LVS)',345,408,'p'],
+          ['Emulation / FPGA prototyping',300,452,'v'],
+          ['Post-silicon bring-up',452,485,'v'],
+          ['Post-Si validation + ECO refab',452,545,'v']
+        ].map(([t,x0,x1,k],i)=>{const y=44+i*18;const C={a:['#101c36','#7aa2ff'],d:['#2a1f08','#ff9900'],p:['#221a33','#c99bff'],v:['#14332f','#2bd4c4']}[k];const tc={a:'#7aa2ff',d:'#cfdaee',p:'#c99bff',v:'#2bd4c4'}[k];return `<text x="168" y="${y+9}" text-anchor="end" fill="${tc}" style="font-size:8px">${t}</text><rect x="${x0}" y="${y}" width="${x1-x0}" height="12" rx="3" fill="${C[0]}" stroke="${C[1]}" stroke-width="${k==='v'?1.6:1.2}"/>`;}).join('')}
+        <!-- BIMODAL block-DV bar: solid peak pre-freeze, faded tail freeze→tape-out, second solid hump at bring-up -->
+        <text x="168" y="197" text-anchor="end" fill="#2bd4c4" style="font-size:8px;font-weight:700">Block + full-chip DV</text>
+        <rect x="200" y="188" width="130" height="12" rx="3" fill="#1c5248" stroke="#2bd4c4" stroke-width="1.8"/>
+        <rect x="330" y="188" width="80" height="12" rx="3" fill="#14332f" stroke="#2bd4c4" stroke-width="1.2" opacity="0.75"/>
+        <rect x="452" y="188" width="70" height="12" rx="3" fill="#1c5248" stroke="#2bd4c4" stroke-width="1.6"/>
+        <text x="265" y="197" text-anchor="middle" style="font-size:7.5px" fill="#bfeee7">peak</text>
+        <text x="370" y="197" text-anchor="middle" style="font-size:7.5px" fill="#8fb8b2">coverage tail</text>
+        <text x="487" y="197" text-anchor="middle" style="font-size:7.5px" fill="#bfeee7">bring-up hump</text>
+        <!-- long-pole brace over the full verification span -->
+        <path d="M175 284 L175 290 L545 290 L545 284" fill="none" stroke="#2bd4c4" stroke-width="1.4"/>
+        <text x="360" y="307" text-anchor="middle" class="lbl" fill="#2bd4c4">The long pole is the pole that <tspan font-style="italic">prevents the longer pole</tspan> — a respin</text>
+        <text x="360" y="321" text-anchor="middle" class="lbls">verification spans architecture → past tape-out → post-silicon; cutting it removes the evidence, not the risk</text>
+        <text x="175" y="335" class="lbls" fill="#5b6d90">Illustrative datacenter-class ASIC schedule; spans not to scale. Blue = architecture · orange = design · purple = backend/PD · teal = verification</text>
+        <!-- the tempting cut on the DV bar... -->
+        <text x="228" y="172" text-anchor="middle" class="lbls" fill="#ff6b6b">✂ "cut it to save schedule?"</text>
+        <path d="M228 176 L243 186" class="flowR"/>
+        <text x="228" y="164" text-anchor="middle" style="font-size:7.5px" fill="#8fb8b2">saves a little, here</text>
+        <!-- ...but the escape it lets through costs a full respin that overshoots the whole schedule -->
+        <rect x="452" y="206" width="88" height="12" rx="3" fill="#25121a" stroke="#ff6b6b" stroke-width="1.4"/>
+        <text x="168" y="215" text-anchor="end" fill="#ff6b6b" style="font-size:8px">…escape → full RESPIN</text>
+        <path d="M243 186 C243 206 400 210 452 212" fill="none" stroke="#ff6b6b" stroke-width="1.2" stroke-dasharray="2 2"/>
+        <text x="545" y="215" text-anchor="end" style="font-size:7px" fill="#ff9a9a">+1 quarter, unpatchable →</text>
+      </svg></div>
+      <div class="note">A leads meeting asked: <i>"why do we even need DV?"</i> — architecture, design, backend/PD, DFT, emulation and more all sat between spec and silicon, yet DV, the longest bar, was the one eyed for cuts. <b>Part II = that old question, now aimed at DV because AI can write the RTL.</b></div>
+      <div class="note" style="margin-top:6px;font-style:normal;color:#5b6d90">The industry reference for "verification is the largest single effort in the project" is the <b style="color:#8fa3c6;font-style:normal">Wilson Research Group Functional Verification Study</b>, commissioned by Siemens EDA (Harry Foster) — the biennial survey of functional-verification effort.</div>
+    </div>
+    <div class="col">
+      <div class="dg" style="max-height:210px"><svg viewBox="0 0 520 220" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <rect x="20" y="18" width="480" height="86" rx="10" fill="#0f2018" stroke="#39d98a"/>
+        <text x="40" y="40" class="lbl" fill="#39d98a" font-weight="700">CONFORMANCE — a perfect translator solves this</text>
+        <rect x="40" y="52" width="90" height="34" rx="6" class="box"/><text x="85" y="73" text-anchor="middle" class="lbls">spec</text>
+        <path d="M132 69 L168 69" class="flow2"/><text x="150" y="60" text-anchor="middle" class="lbls">translate</text>
+        <rect x="170" y="52" width="90" height="34" rx="6" class="box"/><text x="215" y="73" text-anchor="middle" class="lbls">RTL</text>
+        <path d="M262 69 L298 69" class="flow2"/>
+        <rect x="300" y="52" width="170" height="34" rx="6" fill="#0f2018" stroke="#39d98a"/><text x="385" y="73" text-anchor="middle" class="lbls" fill="#39d98a">matches the words ✓</text>
+        <rect x="20" y="116" width="480" height="90" rx="10" fill="#25121a" stroke="#ff6b6b"/>
+        <text x="40" y="138" class="lbl" fill="#ff6b6b" font-weight="700">CORRECTNESS — still needs DV</text>
+        <rect x="40" y="150" width="90" height="42" rx="6" fill="#1d2a49" stroke="#ff9900"/><text x="85" y="175" text-anchor="middle" class="lbls" fill="#ff9900">same RTL</text>
+        ${[['state-space',175],['seams',290],['destructive\\nevents',390]].map(([t,x])=>{const l=t.split('\\n');return `<path d="M132 171 L${x-40} 171" class="flowR"/><rect x="${x-40}" y="150" width="105" height="42" rx="6" fill="#16203a" stroke="#ff6b6b"/>${l.map((s,k)=>`<text x="${x+12}" y="${l.length>1?166+k*15:175}" text-anchor="middle" class="lbls" fill="#ff9a9a">${s}</text>`).join('')}`;}).join('')}
+        <text x="260" y="212" text-anchor="middle" class="lbls">the spec never enumerated these — generating the RTL doesn't close them</text>
+      </svg></div>
+      <div class="note">Ex: "on reset, the counter zeroes" → the translator emits exactly that (conformant). It is <i>silent</i> on reset mid-transfer while a completion is in flight — and that silence is Part II.</div>
+      ${ai("A model helps on BOTH halves Part I described — draft the RTL AND scaffold the checkers. What it cannot be is the INDEPENDENT authority: a policy graded on its own outputs certifies nothing. DV supplies the spec-anchored, policy-independent verifier — the checker-independence argument (section 4, slides 11-12) makes precise why independence has to come from the signal's provenance, not from using a second model.")}
+    </div>
+  </div>
+  ${foot('03 · From Part I to Part II')}
+</div>`);
+
+/* ---- 4. THESIS: conformance vs correctness ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The thesis · 1 of 2</div>
+  <h2 class="title">Conformance vs correctness — <span class="hl">the distinction, precisely</span></h2>
+  <div class="sub">Conformance is a <b>translation</b> problem. Correctness is a <b>distribution</b> problem. Different problems, different tools — and a perfect translator only ever solves the first.</div>
+  <div class="plain"><span class="lvl">In plain terms</span> "We built what the spec said" is <b>not</b> the same as "the thing actually works everywhere it'll be used." A flawless translator guarantees the first; only verification earns the second — same as a model acing its evals ≠ being right in the wild.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card"><h3>Conformance = matches the document</h3>
+      <p class="small"><b>"We built what the spec asked for"</b> — a faithfulness relation between two documents (spec ↔ design). A perfect spec-to-RTL translator maxes this out <i>by definition</i>. If conformance were the whole job, an ideal translator would end verification.</p></div>
+      <div class="card" style="margin-top:12px"><h3>Correctness = robust over the state-space</h3>
+      <p class="small"><b>"The thing behaves as it must across the entire reachable state space"</b> — most of which the spec never describes. Real silicon is <i>sequential</i>: behavior is a trajectory through an astronomically large state space, not a single output. The spec is a behavior <i>description</i>, not an <i>enumeration</i>. <span class="def">(Correctness spans two axes: genuine distribution-shift, and rare reachable-state conjunctions that are perfectly in-distribution and legal — most hardware corners are the latter.)</span></p></div>
+      <div class="card" style="margin-top:12px"><h3>Why a perfect translator cannot reach it</h3>
+      <p class="small">The translator's ceiling is its input. Perfect fidelity to a document that under-specifies behavior faithfully reproduces the under-specification. Garbage-in is not required — <b>silence-in is enough</b>.</p></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>A concrete example</h3>
+      <p class="small">A control block modeled as an <b>FSM</b> <span class="def">(finite state machine: control logic whose output depends on accumulated history, not just current inputs)</span> with 12 named states + legal transitions is a faithful, translatable description. But 12 states plus a few concurrent flags, counters, and in-flight requests yields <i>millions</i> of reachable composite states. A translator reproduces the 12 named states perfectly (conformance); whether the machine is safe in the millions of unnamed composite states is correctness — unanswerable by reading either document.</p></div>
+      ${ai("CONFORMANCE :: the model passes the given evals / matches the reference outputs. CORRECTNESS :: the model is robust over the full input-and-state distribution it is deployed into. Every team here has shipped a model that aced its eval suite and then failed on the rare, in-distribution tail its evals never sampled (and sometimes on genuine distribution-shift too) — that failure is not a translation bug, it is the correctness axis the eval suite never measured. Sharpest version: if one model both TRANSLATES the spec into RTL and GENERATES its own checker, conformance evidence becomes self-referential — grading a policy against its own outputs, which certifies nothing without an independent, spec-anchored oracle (the circularity argument, section 4).")}
+    </div>
+  </div>
+  ${foot('04 · Conformance vs correctness')}
+</div>`);
+
+/* ---- 5. THESIS: why the gap is permanent ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The thesis · 2 of 2</div>
+  <h2 class="title">Why the gap is <span class="hl">permanent</span>, not a spec-quality problem</h2>
+  <div class="sub">You cannot close correctness by writing a better spec — the state-space is too large to enumerate in prose. This is the load-bearing rung of the argument.</div>
+  <div class="plain"><span class="lvl">In plain terms</span> A perfect, unambiguous spec still needs DV — because a spec states <b>rules</b>, it can never list every situation the chip will hit. "Write a better spec" is the hardware twin of "write more evals": it helps, but it can't cover a space this big.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card"><h3>"Then just write a complete spec"</h3>
+      <p class="small">The seductive objection fails <i>structurally</i>, not for lack of diligence. A specification is <b>compressive / intensional by design</b> — it defines behavior by <i>rule</i>, not by enumerating every case, so a human can reason about it. An enumeration of every reachable state is exponential in the number of state elements; no team writes, reads, or maintains that document. This is compression, not negligence — the detail was never authored, it is <i>derived</i> by composition.</p></div>
+      <div class="card" style="margin-top:12px"><h3>So the gap is intrinsic to the medium</h3>
+      <p class="small">No amount of translation fidelity manufactures information that was never in the source. <b>"The model is a perfect translator" and "verification is unnecessary" are independent claims</b> — the first can be fully true while the second stays false. Conformance is checked <i>by construction</i>; correctness must be <i>earned by exercise</i>.</p></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>The takeaway to carry: even a 100% unambiguous spec still needs DV</h3>
+      <p class="small">An unambiguous spec removes <i>ambiguity</i>. It does not remove: the exploding <b>state-space</b> (still un-enumerated), the <b>negative space</b> (events it never mentions), the <b>microarchitecture</b> it leaves open, the <b>integration seams</b> between blocks, or the <b>circularity risk</b> if the design grades itself. Verification exists to generate evidence about exactly the axis the spec — however perfect — cannot cover.</p></div>
+      <div class="card" style="margin-top:12px"><h3>Concrete</h3>
+      <p class="small">"No data is lost" is one sentence — trivially translatable, trivially true on the happy path. Its correctness lives below the waterline: is it still true when the <b>credit pool</b> <span class="def">(a finite pool of flow-control tokens a sender must hold to issue work)</span> hits zero exactly as a new request arrives and a reset lands one cycle later? That composite state is one of millions the sentence implicitly covers and never names.</p></div>
+      ${ai("‘Write a more complete spec’ is the hardware twin of ‘write more evals.’ Both help and both hit the same wall — you cannot enumerate a combinatorial space by hand-authoring cases, and coverage of an enumerable set is not coverage of the distribution. This is why verifiable-reward setups are necessary but not sufficient: a grader anchored only to authored cases certifies the authored cases; the interesting failures live in the un-authored remainder.")}
+    </div>
+  </div>
+  ${foot('05 · Why the gap is permanent')}
+</div>`);
+
+/* ---- 6. SEQUENTIAL: control not math ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Sequential complexity · 1 of 3</div>
+  <h2 class="title">Most silicon complexity is <span class="hl">control, not math</span></h2>
+  <div class="sub">The hard part of a chip is the state machine that decides <i>when</i>, not the arithmetic that computes <i>what</i>.</div>
+  <div class="plain"><span class="lvl">In plain terms</span> Most chip bugs aren't in the math — they're in the <b>control logic</b> that sequences it (when to start, wait, retry, finish). Think a function that depends on hidden accumulated state, not a pure input→output map — so the same input can behave differently depending on history.</div>
+  <div class="body">
+    <div class="col card">
+      <div class="dg"><svg viewBox="0 0 520 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <rect x="40" y="150" width="130" height="54" rx="10" fill="#0f2018" stroke="#39d98a"/><text x="105" y="176" text-anchor="middle" fill="#39d98a" class="lbl">X → Y</text><text x="105" y="194" text-anchor="middle" class="lbls">arithmetic (easy, small)</text>
+        <text x="105" y="128" text-anchor="middle" class="lbls">what the spec nails</text>
+        <path d="M175 177 C220 177 220 150 250 150" class="flow"/>
+        <ellipse cx="360" cy="175" rx="150" ry="120" fill="none" stroke="#ff9900" stroke-dasharray="4 5"/>
+        <text x="360" y="70" text-anchor="middle" fill="#ff9900" class="lbl" font-weight="700">CONTROL / FSM (the bulk + the bugs)</text>
+        ${[['issue',300,120],['wait',420,120],['stall',300,175],['retry',420,175],['drain',300,230],['complete',420,230]].map(([t,x,y])=>`<rect x="${x-42}" y="${y-16}" width="84" height="30" rx="6" class="box"/><text x="${x}" y="${y+4}" text-anchor="middle" class="lbls">${t}</text>`).join('')}
+        <path d="M300 135 L300 159" class="flow2"/><path d="M342 175 L378 175" class="flow2"/><path d="M420 135 L420 159" class="flow2"/><path d="M300 214 L300 230" class="flow2"/><path d="M378 230 L420 214" class="flow2"/>
+        <text x="470" y="290" text-anchor="end" fill="#ff6b6b" class="lbls">↳ transitions the prose never defines: ?</text>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Control is stateful — like a closure over hidden state</h3>
+      <ul class="clean">
+        <li>Software intuition says a chip is mostly datapath (adders, multipliers). Datapath bugs are real (rounding, saturation, precision), but the <b>deep, hard-to-reach</b> bugs skew heavily toward <b>control</b>: the sequencing that decides when to issue, stall, retry, arbitrate, drain, complete.</li>
+        <li>Control is built from <b>FSMs</b> <span class="def">(logic whose output depends on accumulated history, not just current inputs)</span> — like a function closing over hidden mutable state, not a pure function of its arguments. Same input, different moment, different behavior.</li>
+        <li>A spec can fully describe a pure function (given X, produce Y). It cannot fully describe a stateful process — behavior depends on the whole path of prior events: every partial transfer, every credit outstanding, every reset that half-landed.</li>
+      </ul></div>
+      ${ai("This is the difference between grading a stateless mapping and grading a policy that acts over a trajectory. A spec pins down the input→output relation (a fixed answer key) but under-specifies the state-dependent dynamics (a policy's behavior across an episode). Helps: FSMs are extractable structure — a model can enumerate declared states and flag transitions the prose never defines. Fails: it cannot infer hidden state the prose omits; a translator matching only stated input/output pairs produces control logic that is wrong on every path the spec did not enumerate.")}
+    </div>
+  </div>
+  ${foot('06 · Control, not math')}
+</div>`);
+
+/* ---- 7. SEQUENTIAL: state-space explosion ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Sequential complexity · 2 of 3</div>
+  <h2 class="title">State-space explosion — <span class="hl">why exhaustive testing is impossible</span></h2>
+  <div class="sub">Sequential state combines <i>combinatorially</i>. The reachable behaviors of even a modest block outnumber anything you could ever enumerate — so verification samples the interesting regions, it never lists them.</div>
+  <div class="plain"><span class="lvl">In plain terms</span> Even a small block has more reachable states than you could ever test one-by-one, so you <b>sample</b> the interesting ones — which means "all my tests passed" only ever covers the states you <i>thought of</i>. The escaped bug lives in a combination you didn't.</div>
+  <div class="body">
+    <div class="col card">
+      <div class="dg"><svg viewBox="0 0 520 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <text x="40" y="34" class="lbls">counter (0..k) × queue-depth (0..n) × in-flight IDs × FSM state = …</text>
+        ${[...Array(11)].map((_,r)=>[...Array(16)].map((_,c)=>`<rect x="${40+c*29}" y="${50+r*24}" width="24" height="19" rx="2" fill="${(r>7||c>11)?'#0d1526':'#16203a'}" stroke="#22314f" stroke-width="0.6" opacity="${(r>7||c>11)?0.5:1}"/>`).join('')).join('')}
+        <rect x="40" y="50" width="140" height="67" rx="3" fill="none" stroke="#2bd4c4" stroke-width="1.6"/><text x="110" y="135" text-anchor="middle" fill="#2bd4c4" class="lbls">tests you wrote / your eval set</text>
+        <rect x="446" y="242" width="24" height="19" rx="2" fill="#25121a" stroke="#ff6b6b" stroke-width="1.6"/><text x="440" y="285" text-anchor="end" fill="#ff6b6b" class="lbls">the escaped bug — a point you never named</text>
+      </svg></div>
+      <div class="note">The lit corner is the spec + your tests. The dark room is the reachable state-space.</div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>The multiplication is the killer</h3>
+      <ul class="clean">
+        <li>A pure function of a few inputs has a small, listable set of cases. A stateful design does not: its behavior is a point in the <i>product</i> of every state element — each counter, queue slot, outstanding-request tag, FSM state.</li>
+        <li>A handful of small state elements already yields more reachable combinations than gradient steps in every large-model training run ever done (illustrative order-of-magnitude, not a metric). You cannot list them, cannot test them one by one.</li>
+        <li>So simulation-based DV never enumerates: it defines the <b>interesting</b> regions (boundaries, saturation, concurrency corners) and samples them with randomized-but-legal stimulus until a coverage model confirms each region was actually reached.</li>
+        <li><b>The partial exception — formal verification:</b> it <i>proves</i> a property over the <i>whole</i> reachable space within bounds, not by sampling. But it proves only the properties you thought to state — so the completeness gap re-enters as <i>which properties</i>, and if one model writes both the RTL and the property, the circularity argument (section 4) returns. Formal shifts the gap; it does not remove it.</li>
+        <li>The corners that break silicon are deep in this space: the bug that appears only when the queue is full <i>and</i> a reset arrives mid-transfer <i>and</i> two requests return out of order in one cycle. No prose enumerates that conjunction — and note it is entirely <i>legal, in-distribution</i> traffic, just a rare reachable combination.</li>
+      </ul></div>
+      ${ai("Same held-in-coverage-≠-distributional-robustness axis as the last argument — here it becomes an EXPLORATION problem. Helps: generating stimulus aimed at named, still-empty regions (coverage-directed generation) — a sparse-reward search where each probe costs a full simulation, so sample-efficiency is the real constraint. The sharp reward-design point: reward the reachability of NEW regions (a novelty/exploration bonus), not the count of green cases — otherwise you train something that maximizes a coverage number while the deep corners stay dark.")}
+    </div>
+  </div>
+  ${foot('07 · State-space explosion')}
+</div>`);
+
+/* ---- 8. SEQUENTIAL: hidden microarchitecture ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">Sequential complexity · 3 of 3</div>
+  <h2 class="title">Hidden microarchitecture — <span class="hl">one spec, many valid chips</span></h2>
+  <div class="sub">A spec fixes the correctness-relevant boundary and deliberately leaves the judged-neutral internals open — so two "spec-correct" implementations differ, and each has its own distinct <i>bug surface</i>. (And whether an internal really was neutral is itself a fallible architectural call — which is partly why DV exists.)</div>
+  <div class="plain"><span class="lvl">In plain terms</span> One spec can become <b>many</b> valid chips — the spec says <i>what</i>, the implementer picks the <i>how</i> (sizes, priorities, timing). Each choice has its own places bugs can hide, so "the RTL matches the spec" isn't even a single target — like one prompt yielding many different valid programs.</div>
+  <div class="body">
+    <div class="col card" style="flex:0 0 46%">
+      <div class="dg"><svg viewBox="0 0 520 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <rect x="180" y="24" width="160" height="46" rx="10" fill="#1d2a49" stroke="#7aa2ff"/><text x="260" y="46" text-anchor="middle" fill="#7aa2ff" class="lbl">behavior spec (WHAT)</text><text x="260" y="62" text-anchor="middle" class="lbls">silent on HOW</text>
+        ${[['shallow buf +\\nround-robin',90,'#2bd4c4',0],['deep buf +\\nfixed-priority',260,'#ff9900',1],['+ extra clock-\\ndomain crossing',430,'#2bd4c4',0]].map(([t,x,c,sel])=>{const l=t.split('\\n');return `<path d="M260 70 L${x} 120" class="flow"/><rect x="${x-72}" y="120" width="144" height="56" rx="9" fill="${sel?'#241a08':'#101c36'}" stroke="${c}" stroke-width="${sel?2.2:1.4}"/>${l.map((s,i)=>`<text x="${x}" y="${142+i*16}" text-anchor="middle" class="lbls">${s}</text>`).join('')}${[...Array(9)].map((_,d)=>`<circle cx="${x-40+ (d%5)*20}" cy="${200+Math.floor(d/5)*18}" r="3" fill="${c}" opacity="0.7"/>`).join('')}<text x="${x}" y="252" text-anchor="middle" class="lbls">own state-space + own bugs</text>`;}).join('')}
+        <text x="260" y="300" text-anchor="middle" class="lbls">all three pass the same boundary tests — different machines underneath</text>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Choices the spec leaves open as correctness-neutral</h3>
+      <ul class="clean">
+        <li><b>Buffer depths</b> — how many in-flight requests before the block stalls. Too shallow throttles; too deep hides ordering bugs. Each depth adds ordering corners the other never reaches.</li>
+        <li><b>Arbitration policy</b> — the rule picking which requester wins one shared resource (round-robin, fixed-priority, credit-based). It changes fairness, latency, and which starvation corners exist.</li>
+        <li><b>Clock-domain crossing</b> — how a signal is safely handed between two circuits on unsynchronized clocks. A notorious bug source because a bit sampled mid-transition can be read as both 0 <i>and</i> 1 by different logic — yet the spec treats the safe hand-off as an implementation detail.</li>
+      </ul>
+      <p class="small" style="margin-top:8px">(Architects <i>do</i> constrain internals when they are correctness-relevant — ordering models, fairness bounds, a mandated synchronizer. The point is the ones judged neutral.) Two implementations can BOTH be faithful translations of the SAME spec and still be different machines with <i>disjoint risk regions</i>. <b>"The translation is correct" is not even a single well-defined target</b> — there is a <i>family</i> of correct-at-the-boundary designs, each needing its own verification. The crux: the spec is a behavior description, not a blueprint of the state-space.</p></div>
+      ${ai("The spec-to-RTL map is one-to-MANY — like decoding many valid completions from one prompt; each sample is a different program with its own internal dynamics and failure surface. Helps: a model is genuinely good at generating a plausible microarchitecture and the boilerplate to realize it. Load-bearing hedge: ‘matches the spec at the boundary’ does not pin down the internal state-space the model just chose, and generating the RTL does not generate the evidence that this structure is bug-free — nor can it verify that against the spec alone, because the spec never described the internals it invented.")}
+    </div>
+  </div>
+  ${foot('08 · Hidden microarchitecture')}
+</div>`);
+
+/* ---- 9. WHAT-IF: the silent spec ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The what-if gap · 1 of 2</div>
+  <h2 class="title">The silent spec — <span class="hl">the negative space</span></h2>
+  <div class="sub">A spec defines intended behavior — including named error and boundary responses. What it cannot enumerate is the <b>combinatorial cross-product</b>: this event, at this exact moment, in this internal state. The dangerous behavior lives in that un-enumerated space — and a faithful translator faithfully inherits its silence.</div>
+  <div class="plain"><span class="lvl">In plain terms</span> Specs describe what <i>should</i> happen; they're mostly silent on the nasty "what-ifs" (a reset mid-operation, a glitch, an interrupt at the worst moment). But <b>"undefined" is a spec property, not a chip property</b> — the hardware still does <i>something</i>; DV's job is to go find out what.</div>
+  <div class="body">
+    <div class="col card" style="flex:0 0 50%">
+      <div class="dg"><svg viewBox="0 0 520 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <rect x="0" y="0" width="520" height="340" fill="#0a0f1c"/>
+        ${[...Array(70)].map((_,i)=>`<circle cx="${25+ (i*53)%490}" cy="${30+ ((i*97)%290)}" r="1.6" fill="#22314f"/>`).join('')}
+        <path d="M20 175 Q170 168 300 178 T500 172" stroke="#ff9900" stroke-width="3" fill="none"/>
+        <text x="150" y="150" fill="#ff9900" class="lbls">HAPPY PATH — what the spec describes</text>
+        ${[['reset mid-op',150,235],['IRQ during commit',330,120],['credit pool empty',400,250],['clock-domain glitch',120,90]].map(([t,x,y])=>`<circle cx="${x}" cy="${y}" r="4.5" fill="#ff6b6b"/><text x="${x}" y="${y-9}" text-anchor="middle" fill="#ff9a9a" class="lbls">${t}</text>`).join('')}
+        <text x="260" y="322" text-anchor="middle" class="lbls">NEGATIVE SPACE — undocumented states, orderings, stress, faults (where DV operates)</text>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Silence has real semantics</h3>
+      <ul class="clean">
+        <li>The happy path is a thin, well-lit line through an enormous dark region of undocumented states and event orderings. DV's core job is to operate in that dark region <i>on purpose</i>.</li>
+        <li>The spec is silent on the destructive because prose scales badly: you can describe one intended behavior compactly, but not the cross-product of "this event at this exact moment in this internal state." Authors document intent, leave the rest implicit.</li>
+        <li><b>"Undefined" is a spec property, not a device property.</b> An undocumented event still does <i>something</i> — the state machine advances on the next clock edge whether or not the spec anticipated it. The gates always act; the question is whether that action is safe.</li>
+        <li>For a data-movement engine, the spec says "given a <b>descriptor</b> <span class="def">(the small command record telling the block what to move)</span>, read source, write destination, signal completion." It does not say what the completion count should be if a reset arrives after the reads issue but before the writes retire — yet that ordering is common, and the device WILL do something.</li>
+      </ul></div>
+      ${ai("The distinctive twist here is SELECTION BIAS: the events you did not think to test are not a random sample — by construction they are the corners (the ones easy to imagine are the ones you already covered). A model is useful at broadening the enumeration (proposing destructive event classes a tired human skips), but cannot certify completeness — ‘I generated 200 negative cases’ is a coverage claim, not a proof that the 201st, the one that ships, was among them. It widens the lit region; it cannot eliminate the dark one.")}
+    </div>
+  </div>
+  ${foot('09 · The silent spec')}
+</div>`);
+
+/* ---- 10. WHAT-IF: inject + invariants ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The what-if gap · 2 of 2</div>
+  <h2 class="title">DV injects the undocumented &amp; audits <span class="hl">system invariants</span></h2>
+  <div class="sub">DV does not wait for chaos — it manufactures the undocumented event at the worst possible moment, then asks: did the device stay safe? And it asserts global properties no single block owns.</div>
+  <div class="plain"><span class="lvl">In plain terms</span> DV deliberately breaks things (resets, glitches, overload) at the worst instant, and checks <b>system-wide promises</b> like "no data is ever lost." Catch: a promise only counts if the test actually reached the stress point — a check that never fired is a false green.</div>
+  <div class="body">
+    <div class="col">
+      <div class="card"><h3>INJECT — destructive / negative testing</h3>
+      <ul class="clean">
+        <li><b>Reset mid-operation:</b> assert reset while transfers are in flight. After it clears, is the device in a clean, defined state — or did a half-finished operation survive to corrupt the next? (The spec may define reset cleanly; what it cannot enumerate is reset landing at <i>every</i> mid-operation instant.)</li>
+        <li><b>Async interrupts / events:</b> deliver an event at a boundary the spec never contemplated (between a transfer's data phase and its completion). Async = uncorrelated with the device's clock, so DV sweeps arrival time across the whole operation.</li>
+        <li><b>Clock-domain glitches:</b> perturb timing at the seam between two unsynchronized clocks — the same clock-domain-crossing hazard from the negative-space map, now <i>injected on purpose</i> to see if the hand-off survives. A hardware bug with no software analog.</li>
+        <li><b>Back-pressure</b> <span class="def">(a receiver signalling "I am full, stop")</span> <b>to exhaustion:</b> hold it far longer than buffers were sized for — does the device stall gracefully or drop/duplicate data?</li>
+      </ul>
+      <p class="note" style="font-style:italic">From the field: a flow-control counter that never came near its limit under normal load overflowed on <i>every</i> cycle once the drain side was held far past what the buffer was sized for while the fill side kept accepting already-committed work. A real, high-severity silicon bug living entirely in the exhaustion corner — unreachable by any realistic traffic.</p></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>AUDIT — system invariants</h3>
+      <ul class="clean">
+        <li>An <b>invariant</b> is a property that must hold across ALL states and ALL time — not a specific output for a specific input. Canonical: <i>"no data lost or duplicated when a credit pool is exhausted."</i></li>
+        <li>Invariants are <b>system-wide, not block-local</b>: producers and consumers each obey their own spec section perfectly, yet "no loss under exhaustion" is only true if their <i>interaction</i> is safe — a property in the gap between the specs.</li>
+        <li>Under light load the pool never empties, so a "lose data when empty" bug never fires. The invariant is only meaningfully tested <b>at the exhaustion corner</b> — exactly the negative-space region the spec left silent. Reaching the corner is what makes the check non-vacuous.</li>
+      </ul>
+      <p class="note" style="font-style:italic">From the field, the sharper twist: a work item carried a routing tag that went out of range; the block silently snapped it to a valid-but-switched-off target and held it, waiting forever — no drop, no error, no timeout. The sting: the "no data lost" check never even <i>ran</i>, because the run never reached the point where it runs. The negative-space bug gagged the very invariant meant to catch it.</p></div>
+      ${ai("This is adversarial / out-of-distribution testing plus global-constraint checking. The sharp reward-design point is the second story above: <b>a green invariant on a run that never hit the stress corner is vacuous</b> — the exact reward-hack an outcome-only grader exploits (it satisfies the metric by never entering the state the metric guards). A model can draft the catalog of destructive events; it cannot tell which cross-component invariants even exist without system-level grounding.")}
+    </div>
+  </div>
+  ${foot('10 · Inject & audit invariants')}
+</div>`);
+
+/* ---- 11. CIRCULARITY: the checker conundrum ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The checker conundrum · 1 of 2</div>
+  <h2 class="title">Circularity — <span class="hl">when one model grades its own homework</span></h2>
+  <div class="sub">If one model writes BOTH the RTL and the checker that judges it, the oracle is circular: the design is only ever compared against the same model's logic, so a shared blind spot passes silently — and certifies nothing about correctness.</div>
+  <div class="plain"><span class="lvl">In plain terms</span> If the same author writes the design <b>and</b> the test that grades it, they share the same blind spots — it passes while proving nothing. Exactly why you don't let a model grade its own output: the checker must come from the <b>spec</b>, independently.</div>
+  <div class="body">
+    <div class="col card">
+      <div class="dg"><svg viewBox="0 0 520 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <rect x="20" y="16" width="230" height="308" rx="12" fill="none" stroke="#ff6b6b" stroke-dasharray="4 4"/>
+        <text x="135" y="38" text-anchor="middle" fill="#ff6b6b" class="lbl" font-weight="700">CIRCULAR — certifies nothing</text>
+        <rect x="85" y="52" width="100" height="40" rx="8" class="box"/><text x="135" y="76" text-anchor="middle" class="lbl">one MODEL</text>
+        <path d="M110 92 L80 130" class="flow"/><path d="M160 92 L190 130" class="flow"/>
+        <rect x="30" y="132" width="100" height="44" rx="8" fill="#1d2a49" stroke="#ff9900"/><text x="80" y="158" text-anchor="middle" fill="#ff9900" class="lbls">RTL / design</text>
+        <rect x="140" y="132" width="100" height="44" rx="8" fill="#123" stroke="#2bd4c4"/><text x="190" y="158" text-anchor="middle" fill="#2bd4c4" class="lbls">its own checker</text>
+        <path d="M130 154 L138 154" class="flow"/><path d="M138 168 L130 168" class="flow"/>
+        <path d="M80 176 C80 230 190 230 190 176" class="flowR"/>
+        <text x="135" y="250" text-anchor="middle" fill="#ff9a9a" class="lbls">shared blind spot ⇒ silent PASS</text>
+        <rect x="270" y="16" width="230" height="308" rx="12" fill="none" stroke="#39d98a" stroke-dasharray="4 4"/>
+        <text x="385" y="38" text-anchor="middle" fill="#39d98a" class="lbl" font-weight="700">ANCHORED — independent</text>
+        <rect x="320" y="52" width="130" height="42" rx="8" fill="#1d2a49" stroke="#7aa2ff"/><text x="385" y="78" text-anchor="middle" fill="#7aa2ff" class="lbls">SPECIFICATION (authority)</text>
+        <path d="M385 94 L385 132" class="flow2"/>
+        <rect x="310" y="132" width="150" height="42" rx="8" fill="#123" stroke="#2bd4c4"/><text x="385" y="158" text-anchor="middle" fill="#2bd4c4" class="lbls">independent checker</text>
+        <path d="M385 174 L385 212" class="flowO"/><text x="430" y="196" fill="#ff9900" class="lbls">judges</text>
+        <rect x="310" y="212" width="150" height="42" rx="8" fill="#1d2a49" stroke="#ff9900"/><text x="385" y="238" text-anchor="middle" fill="#ff9900" class="lbls">RTL / design</text>
+        <text x="385" y="284" text-anchor="middle" fill="#ff6b6b" class="lbls">forbidden: RTL → checker</text>
+        <path d="M312 233 C285 233 285 165 308 155" fill="none" stroke="#ff6b6b" stroke-width="1.5" stroke-dasharray="3 3"/><text x="278" y="200" fill="#ff6b6b" font-size="13" text-anchor="middle">✗</text>
+      </svg></div>
+      <div class="note">Same design. The only difference is <b>where the definition of "correct" comes from.</b></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>The loop, and the fix</h3>
+      <ul class="clean">
+        <li>A verdict is worth only as much as the <b>independence</b> of the thing producing the expectation. If the expectation comes from the same source as the design, the check is a mirror, not a test.</li>
+        <li>A mistake the model makes building the design — a misread clause, a wrong default, an off-by-one in an FSM corner — is made <i>identically</i> when it builds the checker. The two agree, the suite goes green, nothing was falsified.</li>
+        <li><b>The fix — independent authority:</b> the expectation must derive SOLELY from the spec, by a path that never touches the design's output. This is Part I's cardinal rule one level up: <b>golden = spec, never observed output</b>.</li>
+      </ul></div>
+      <div class="card" style="margin-top:10px"><h3>Concrete</h3>
+      <p class="small">The descriptor encoding says byte-length 0 means a <i>maximum</i>-size transfer. A model generating the RTL misreads it as a zero-byte no-op. If the SAME model generates the checker, its "expected bytes moved" is also zero — design and checker agree, green, a real bug ships. An independent checker derived only from "length 0 ⇒ max" computes "expected = max" and the mismatch fires immediately.</p></div>
+      <p class="note" style="font-style:italic">From the field, two ways this sneaks in. First: a reference model disagreed with the device on a corner, and the fast fix — tried twice — was to reshape the model until it matched the output; it even felt like progress. A reviewer refused it flat: the spec is the only authority, never the output. Re-reading the spec, the model had been right all along and the real defect was upstream in how the inputs were built. Second, subtler: elsewhere a corner was "resolved" by editing the <i>spec</i> to match the device — and a second independent model happened to agree with the device, which felt reassuring. It was worthless: that second model's corner was itself wrong, so "device and reference agree" was two wrong answers agreeing. Same laundering move, either way.</p>
+      ${ai("Self-grading is structural, not a prompt bug — the same as an LLM-judge scoring its own generations. It is <b>insensitive to correlated error</b> (it does not select toward error, it is blind to it): where generator and grader share a blind spot, the mismatch simply never fires. The fix is <b>provenance, not model diversity</b> — the reward signal must not be derivable from the thing it grades (RLHF grounds it in human preferences; DV grounds it in the spec). A second model trained on the design's own output would still be circular.")}
+    </div>
+  </div>
+  ${foot('11 · The checker conundrum')}
+</div>`);
+
+/* ---- 12. CIRCULARITY: independence has a floor ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The checker conundrum · 2 of 2</div>
+  <h2 class="title">Independence is necessary — but a checker is <span class="hl">only as good as its anchor</span></h2>
+  <div class="sub">Anchoring the checker to the spec breaks the circular oracle — but it does not manufacture ground truth. It inherits the spec's ambiguities, so a guessed premise re-introduces circularity through the back door.</div>
+  <div class="plain"><span class="lvl">In plain terms</span> An independent checker is only as trustworthy as the spec it's built from. If the spec is <b>ambiguous</b> and you quietly guess, your guess becomes the authority — and if the designer guessed the same way, you're back to two blind spots agreeing. Fix: flag the ambiguity, don't fill it silently.</div>
+  <div class="body">
+    <div class="col card" style="flex:0 0 46%">
+      <div class="dg"><svg viewBox="0 0 460 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <rect x="150" y="20" width="170" height="50" rx="9" fill="#1d2a49" stroke="#7aa2ff"/><text x="235" y="42" text-anchor="middle" fill="#7aa2ff" class="lbls">SPECIFICATION</text><text x="235" y="59" text-anchor="middle" fill="#ffcc66" class="lbls">may be ambiguous / silent</text>
+        <path d="M235 70 L235 120" class="flow2"/><text x="300" y="98" fill="#2bd4c4" class="lbls">derive (cite provenance)</text>
+        <rect x="150" y="120" width="170" height="46" rx="9" fill="#123" stroke="#2bd4c4"/><text x="235" y="147" text-anchor="middle" fill="#2bd4c4" class="lbls">independent checker</text>
+        <path d="M150 143 C90 143 90 60 130 40" class="flowR"/><text x="70" y="205" fill="#ff6b6b" class="lbls" text-anchor="middle">if the value is</text><text x="70" y="220" fill="#ff6b6b" class="lbls" text-anchor="middle">GUESSED here…</text>
+        <rect x="20" y="232" width="150" height="44" rx="9" fill="#25121a" stroke="#ff6b6b"/><text x="95" y="252" text-anchor="middle" fill="#ff9a9a" class="lbls">de-facto authority</text><text x="95" y="268" text-anchor="middle" fill="#ff9a9a" class="lbls">= the guess</text>
+        <path d="M235 166 L235 232" class="flowO"/>
+        <rect x="150" y="232" width="170" height="46" rx="9" fill="#1d2a49" stroke="#ff9900"/><text x="235" y="259" text-anchor="middle" fill="#ff9900" class="lbls">RTL — judged ✓</text>
+        <path d="M150 254 C120 254 120 254 95 276" fill="none" stroke="#ff6b6b" stroke-width="1.4" stroke-dasharray="3 3"/><text x="120" y="300" fill="#ff6b6b" class="lbls">if design guessed the same ⇒ circular again</text>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Verifiable ≠ correct</h3>
+      <ul class="clean">
+        <li>Anchoring to the spec removes the design-agrees-with-itself failure. It does NOT remove the spec-is-wrong-or-ambiguous failure. The checker is a fallible verifier, upper-bounded by the authority it descends from.</li>
+        <li><b>Where the loop sneaks back:</b> if the spec is silent and the checker's author GUESSES a default, that guess becomes the de-facto authority. If it matches the assumption the <i>design's</i> author made about the same clause, checker and design agree again — back inside an invisible circular loop.</li>
+        <li>So independence of <i>authorship</i> is not enough when both authors quietly fill the same gap the same way. The full requirement is a <b>chain of custody for "correct"</b>: derive only from spec · every value has named provenance (a cited clause, not a default) · genuine ambiguity runs under a LABELED provisional assumption surfaced to the spec owner.</li>
+      </ul>
+      <p class="note" style="font-style:italic">From the field, on a fresh block: every test ended by polling one "is the block fully drained?" condition before checking nothing was lost — the drain oracle for the <i>whole suite</i>. Two spec documents defined "drained" differently: one listed four conditions, the other omitted a one-deep staging buffer and listed three. Guess the three-term version, and if the designer had quietly made the same omission, every test would declare "drained" with a message still in flight and reconcile green — a suite-wide false-pass from a single default. It was surfaced as a labeled question rather than guessed; the design later confirmed four was right, so no test ever passed on a false premise.</p></div>
+      ${ai("Two distinct failure surfaces. Circular-oracle (same source grades itself): structural — fixed by architecture, separate the generator from the verifier. Ambiguous-anchor (spec underspecifies): epistemic — fixed by authority; the model can flag the gap and size its blast radius but cannot fill it. The dangerous move is silently collapsing the second into the first: guessing the ambiguous value and letting the guess become the oracle. Reward the model for cited provenance and for abstaining-under-ambiguity (surfacing a labeled question), not for a fluent, confident default that happens to make the suite green.")}
+    </div>
+  </div>
+  ${foot('12 · Independence has a floor')}
+</div>`);
+
+/* ---- 13. THE INTEGRATION SEAM ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The integration seam</div>
+  <h2 class="title">The whole is greater than the <span class="hl">sum of verified parts</span></h2>
+  <div class="sub">Every block can pass its own verification and the system can still be broken — because the composition itself was never the thing under test.</div>
+  <div class="plain"><span class="lvl">In plain terms</span> Every block can be individually perfect and the chip still breaks — the bug lives in the <b>seam between</b> blocks (address mismatches, shared-resource contention, deadlock). Same as microservices that each pass their own tests but deadlock once wired together — and silicon can't be hot-patched.</div>
+  <div class="body">
+    <div class="col card" style="flex:0 0 48%">
+      <div class="dg"><svg viewBox="0 0 520 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        ${[['data-mover',110,90],['block B',340,90],['block C',110,250],['memory',340,250]].map(([t,x,y])=>`<rect x="${x-60}" y="${y-28}" width="120" height="56" rx="9" fill="#0f2018" stroke="#39d98a"/><text x="${x}" y="${y-2}" text-anchor="middle" fill="#39d98a" class="lbls">${t}</text><text x="${x}" y="${y+16}" text-anchor="middle" fill="#39d98a" class="lbls">✓ block-verified</text>`).join('')}
+        <line x1="170" y1="90" x2="280" y2="90" class="flow"/><line x1="110" y1="118" x2="110" y2="222" class="flow"/><line x1="340" y1="118" x2="340" y2="222" class="flow"/><line x1="170" y1="250" x2="280" y2="250" class="flow"/><line x1="150" y1="118" x2="300" y2="222" class="flow"/>
+        ${[['addr translation',225,90],['contention',110,170],['deadlock',225,250],['ordering',235,168]].map(([t,x,y],i)=>`<circle cx="${x}" cy="${y}" r="5" fill="#ff6b6b"/>`).join('')}
+        <text x="225" y="78" text-anchor="middle" fill="#ff9a9a" class="lbls">addr translation</text>
+        <text x="86" y="172" text-anchor="middle" fill="#ff9a9a" class="lbls">contention</text>
+        <text x="225" y="272" text-anchor="middle" fill="#ff9a9a" class="lbls">deadlock</text>
+        <text x="260" y="326" text-anchor="middle" fill="#ff6b6b" class="lbls">seam bugs live on the LINES, never inside a block</text>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Three seams — each owned by no single block</h3>
+      <ul class="clean">
+        <li><b>Address translation:</b> a block filters inputs by an address range valid alone; after <b>SoC</b> <span class="def">(full-chip)</span> translation the range no longer matches, so it silently drops every command and stalls with zero errors.</li>
+        <li><b>Shared-resource contention:</b> blocks that owned a private bus now share one — starvation, priority inversion, head-of-line blocking no block could produce alone.</li>
+        <li><b>Deadlock:</b> A waits on B while B waits on A — a circular wait only the assembled topology can close.</li>
+      </ul></div>
+      <div class="card" style="margin-top:10px"><h3>Why it's the final gate</h3>
+      <p class="small">Neither block is wrong against its own spec — the <i>contract between them</i> is. Escapes fall on a cost ladder: <b>firmware/software workaround</b> (no silicon) → <b>metal <span class="def">ECO</span></b> (a partial respin — only some mask layers, but still a fab turn of weeks) → <b>full base-layer respin</b> (all masks, a quarter-plus, multi-million-dollar). The escape with <i>no</i> workaround forces that last tier, because silicon can't be patched in the field — and that class is what DV exists to prevent.</p></div>
+      <p class="note" style="font-style:italic">From the field: a "real-work" filter keyed to a block-local address range passed every block-level test — then, integrated, the translated addresses fell outside the range, every command was silently discarded, and the block stalled. The whole run emitted <i>exactly one</i> error, at the very end. The filter was a spec-correct decision; the fault lived only in the seam, and the fix was a system-level monitor — in neither block.</p>
+      ${ai("A seam bug is an EMERGENT / COMPOSITIONAL failure: no component's eval contains the composition, so the joint behavior was never a target. A model can enumerate candidate seams from the topology; it cannot certify their ABSENCE from block specs alone. Key distinction: <b>every block green</b> is not a gamed metric — it is a proxy that was simply never sensitive to the seam.")}
+    </div>
+  </div>
+  ${foot('13 · The integration seam')}
+</div>`);
+
+/* ---- 14. THE EVOLVING DV ENGINEER ---- */
+slides.push(`
+<div class="slide">
+  <div class="kicker">The evolving role</div>
+  <h2 class="title">From code writer to <span class="hl">audit architect</span></h2>
+  <div class="sub">When generation gets cheap, the scarce skill is judging what was generated — not typing it. The deliverable is not code that runs; it is a defensible argument that the chip is correct.</div>
+  <div class="plain"><span class="lvl">In plain terms</span> When AI makes <i>writing</i> code cheap, the scarce, valuable skill becomes <b>judging</b> it — designing the independent checker, the adversarial tests, and the evidence trail. The DV engineer moves from code-writer to "audit architect." It's the reward/eval-design problem, in silicon.</div>
+  <div class="body">
+    <div class="col card" style="flex:0 0 44%">
+      <div class="dg"><svg viewBox="0 0 460 340" preserveAspectRatio="xMidYMid meet">${DEFS}
+        <text x="115" y="30" text-anchor="middle" class="lbls" fill="#63769a">CODE WRITER (automatable)</text>
+        ${[['harness',60],['driver',110],['checker',160],['coverage',210]].map(([t,y])=>`<rect x="40" y="${y-14}" width="150" height="28" rx="6" fill="#101c36" stroke="#2b3a5e"/><text x="115" y="${y+4}" text-anchor="middle" class="lbls">${t}</text>`).join('')}
+        <path d="M115 224 L115 250" class="flowO"/><text x="115" y="268" text-anchor="middle" fill="#ff9900" class="lbls">generation cost → 0</text>
+        <text x="345" y="30" text-anchor="middle" class="lbl" fill="#fff" font-weight="700">AUDIT ARCHITECT</text>
+        <rect x="270" y="44" width="150" height="40" rx="8" fill="#101c36" stroke="#2b3a5e"/><text x="345" y="62" text-anchor="middle" class="lbls">machine-generated</text><text x="345" y="77" text-anchor="middle" class="lbls">RTL + testbench</text>
+        ${[['independent oracle','#7aa2ff',120],['adversarial stimulus','#2bd4c4',162],['provenance chain','#ffcc66',204]].map(([t,c,y])=>`<rect x="270" y="${y-14}" width="150" height="30" rx="7" fill="#16203a" stroke="${c}"/><text x="345" y="${y+5}" text-anchor="middle" fill="${c}" class="lbls">${t}</text><path d="M345 ${y-14} L345 84" class="flow2" opacity="0.5"/>`).join('')}
+        <path d="M345 218 L345 250" class="flowO"/>
+        <rect x="285" y="252" width="120" height="34" rx="8" fill="#0f2018" stroke="#39d98a"/><text x="345" y="273" text-anchor="middle" fill="#39d98a" class="lbls">signed evidence → tape-out</text>
+      </svg></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>The mission relocates, it does not shrink</h3>
+      <ul class="clean">
+        <li>The old center of gravity was PRODUCTION — writing the harness, drivers, checks, coverage. That is exactly the boilerplate a capable generator now drafts in minutes.</li>
+        <li>If a model writes the RTL AND the testbench, the one thing it cannot manufacture is an <b>independent reason to trust either</b>. Someone must design the authority the design is judged against — anchored solely to the spec.</li>
+        <li>The engineer moves up a level: from AUTHORING checks to ARCHITECTING the audit — deciding what must be proven, what the independent oracle is, which adversarial corners are worth the compute, and what evidence is strong enough to stake a <b>tape-out</b> <span class="def">(the irreversible commit to fabrication — cannot be patched in the field)</span> on.</li>
+        <li>Output = EVIDENCE, on three pillars a model does not supply on its own: <b>authority</b> (oracle traceable to spec), <b>adversarial coverage</b> (negative space exercised on purpose), <b>provenance</b> (every green traces to a spec clause and a <i>real firing</i> — not a paper entry pointing at a test never built).</li>
+        <li>This guards against <b>"green theater"</b>: an auto-generated design and its auto-generated tests agreeing with each other while proving nothing. <b>Automating <i>authoring</i> does not shrink the team — it relocates it to <i>adjudication</i>.</b> Every AI-drafted check is a circularity suspect (section 4), so the more the model generates, the more independent-review-and-judgment capacity you need — generation volume ↑ ⇒ verification-judgment demand ↑, not ↓.</li>
+      </ul></div>
+      ${ai("Concretely: ask a model for a data-mover that copies N bytes A→B — you get plausible RTL in seconds. The scarce work is everything that makes it <i>trustworthy</i>: an oracle that says the right bytes landed <b>derived from the spec, not from what the RTL emitted</b>; an adversarial test that stalls the receiver until buffers overflow (not the happy-path copy); and a green result you can trace to the exact spec clause it proves. That triad — independent oracle · adversarial stimulus · evidence trail — is the reward/eval-design skill, and it is exactly what does NOT come free when the model writes the RTL. Same lesson as ML: cheap to generate a policy, hard to build the grader that certifies it.")}
+    </div>
+  </div>
+  ${foot('14 · From code writer to audit architect')}
+</div>`);
+
+/* ---- 15. CLOSE ---- */
+slides.push(`
+<div class="slide cover">
+  <div class="kicker">The through-line</div>
+  <h2 class="title" style="font-size:38px">Perfect translation solves <span class="hl">"did we build it right?"</span></h2>
+  <div class="quote" style="margin-top:14px;font-size:22px">
+    DV answers the harder question: <span class="hl">"is it actually correct?"</span> — across the sequential <span class="hl">state-space</span>, the <span class="hl">negative space</span>, the <span class="hl">circularity</span> risk, and the integration <span class="hl">seams</span> the spec never enumerated. And the engineer becomes the one who <span class="hl">defines that proof</span>.
+  </div>
+  <div class="epi" style="margin-top:16px">
+    <p>"The ideal reasoner would, when he had once been shown a single fact in all its bearings, deduce from it not only all the chain of events which led up to it but also all the results which would follow from it… To carry the art to its highest pitch, it is necessary that the reasoner should be able to utilise all the facts which have come to his knowledge; and this in itself implies… a possession of all knowledge, which… is a somewhat rare accomplishment."</p>
+    <span class="att">— Arthur Conan Doyle, Sherlock Holmes · the DV engineer's aspiration — and the reason we still <i>test</i>: no reasoner possesses "all the facts" of an exploding state-space, so evidence must be exercised, not assumed.</span>
+  </div>
+  <div class="badgerow" style="margin-top:20px">
+    <div class="badge"><b>Even a 100% unambiguous spec still needs DV</b></div>
+    <div class="badge"><b>Translation = conformance, not correctness</b></div>
+    <div class="badge"><b>The spec is behavior, not the state-space</b></div>
+    <div class="badge"><b>A generator cannot grade itself</b></div>
+    <div class="badge"><b>Bugs live in the seams</b></div>
+    <div class="badge"><b>Code writer → audit architect</b></div>
+  </div>
+  <div class="sub" style="margin-top:18px">As generation gets cheaper, the durable, scarce skill becomes designing the independent verifier, the adversarial evaluation, and the auditable evidence chain — reward and eval design, not policy output. Silicon is just the domain where the worst escapes — the ones no firmware workaround can absorb — cost a full respin, which makes the lesson unignorable. <b>Keep the hedge honest: a verifiable reward is preferable only when a faithful, spec-anchored verifier exists — verifiable ≠ ground truth, and where the spec is silent even a verifiable checker inherits a guessed premise.</b></div>
+  ${foot('15 · Close')}
+</div>`);
+
+/* ============================ ENGINE ============================ */
+const deck = document.getElementById('deck');
+deck.innerHTML = slides.join('');
+const S = [...document.querySelectorAll('.slide')];
+let i = 0;
+function show(n){
+  i = Math.max(0, Math.min(S.length-1, n));
+  S.forEach((s,k)=>s.classList.toggle('active', k===i));
+  document.getElementById('prog').style.width = ((i)/(S.length-1)*100)+'%';
+  document.getElementById('num').textContent = (i+1)+' / '+S.length;
+  location.hash = i+1;
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' ') {show(i+1);e.preventDefault();}
+  else if(e.key==='ArrowLeft'||e.key==='PageUp'){show(i-1);e.preventDefault();}
+  else if(e.key==='Home'){show(0);}
+  else if(e.key==='End'){show(S.length-1);}
+  else if(e.key.toLowerCase()==='f'){if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen();}
+  else if(e.key.toLowerCase()==='p'){window.print();}
+  else if(e.key.toLowerCase()==='o'){document.body.classList.toggle('ov');}
+});
+deck.addEventListener('click',e=>{ if(e.clientX > window.innerWidth*0.62) show(i+1); else if(e.clientX < window.innerWidth*0.18) show(i-1); });
+const start = parseInt(location.hash.replace('#',''))||1; show(start-1);
+</script>
+</body>
+</html>
